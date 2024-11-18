@@ -94,7 +94,7 @@ fn main() {
     DeployerExecType::Init(_) => init(&mut globals, &mut config).unwrap(),
     DeployerExecType::With(args) => assign_pipeline_to_project(&globals, &mut config, &args).unwrap(),
     DeployerExecType::Build(mut args) => build(&mut config, &cache_folder, &mut args).unwrap(),
-    DeployerExecType::CleanBuilds(args) => clean_builds(&cache_folder, &args).unwrap(),
+    DeployerExecType::Clean(args) => clean_builds(&mut config, &cache_folder, &args).unwrap(),
     
     #[cfg(feature = "tests")]
     DeployerExecType::Tests => tests().unwrap(),
