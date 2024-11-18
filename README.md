@@ -144,7 +144,7 @@ Deployer will consider you to specify some things (e.g., targets - for this proj
       "arch": "x86_64",
       "os": "Linux",
       "derivative": "any",
-      "version": "NotSpecified"
+      "version": "No"
     }
   ],
   "deploy_toolkit": null,
