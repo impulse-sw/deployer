@@ -279,6 +279,7 @@ impl Execute for DeployAction {
 }
 
 pub(crate) fn clean_builds(
+  config: &mut DeployerProjectOptions,
   cache_dir: &str,
   args: &CleanArgs,
 ) -> anyhow::Result<()> {
@@ -286,9 +287,14 @@ pub(crate) fn clean_builds(
   path.push(cache_dir);
   path.push(DEPLOY_CACHE_SUBDIR);
   
-  let _ = std::fs::remove_dir_all(path);
+  config.last_build = None;
+  for build in &config.builds {
+    let mut build_path = path.clone();
+    build_path.push(build);
+    let _ = std::fs::remove_dir_all(build_path);
+  }
   
-  if args.include_this {
+  if args.include_artifacts {
     let curr_dir = std::env::current_dir()?;
     let artifacts_dir = curr_dir.join(DEPLOY_ARTIFACTS_SUBDIR);
     if artifacts_dir.as_path().exists() {

@@ -45,8 +45,8 @@ pub(crate) enum DeployerExecType {
   With(WithPipelineArgs),
   /// Build the project
   Build(BuildArgs),
-  /// Clean all builds
-  CleanBuilds(CleanArgs),
+  /// Clean the project's builds
+  Clean(CleanArgs),
   
   #[cfg(feature = "tests")]
   Tests,
@@ -136,7 +136,7 @@ pub(crate) struct WithPipelineArgs {
 pub(crate) struct CleanArgs {
   /// Clean current project artifacts
   #[arg(short, long)]
-  pub(crate) include_this: bool,
+  pub(crate) include_artifacts: bool,
 }
 
 #[derive(Args, Debug)]
