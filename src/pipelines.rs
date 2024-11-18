@@ -52,8 +52,7 @@ pub(crate) fn new_pipeline(
   
   if let Some(from_file) = &args.from {
     let pipeline = read_checked::<DescribedPipeline>(from_file).map_err(|e| {
-      println!("Can't read provided Pipeline file due to: {}", e.to_string());
-      exit(1);
+      panic!("Can't read provided Pipeline file due to: {}", e);
     }).unwrap();
     pipelines.insert(info2str_simple(&pipeline.info), pipeline);
     return Ok(())
@@ -64,10 +63,11 @@ pub(crate) fn new_pipeline(
   
   let info = PipelineInfo { short_name, version };
   
-  if pipelines.contains_key(&info2str_simple(&info)) {
-    if !Confirm::new(&format!("Pipelines Registry already have `{}` Pipeline. Do you want to override it? (y/n)", info2str_simple(&info))).prompt()? {
-      return Ok(())
-    }
+  if
+    pipelines.contains_key(&info2str_simple(&info)) &&
+    !Confirm::new(&format!("Pipelines Registry already have `{}` Pipeline. Do you want to override it? (y/n)", info2str_simple(&info))).prompt()?
+  {
+    return Ok(())
   }
   
   let name = Text::new("Write the Pipeline's full name:").prompt()?;
@@ -278,7 +278,9 @@ pub(crate) fn assign_pipeline_to_project(
   remove_old_pipeline(config, &short_name);
   config.pipelines.push(pipeline);
   
-  config.pipelines = reorder_pipelines_in_project(config.pipelines.clone())?;
+  if config.pipelines.len() >= 2 {
+    config.pipelines = reorder_pipelines_in_project(config.pipelines.clone())?;
+  }
   
   println!("Pipeline is successfully set up for this project.");
   
@@ -290,7 +292,7 @@ fn specify_short_name(
   short_name: &mut String,
 ) -> anyhow::Result<()> {
   while
-    config.pipelines.iter().position(|p| p.title.as_str() == short_name).is_some() &&
+    config.pipelines.iter().any(|p| p.title.as_str() == short_name) &&
     !inquire::Confirm::new(&format!("Do you want to overwrite an existing pipeline `{}` for this project? (y/n)", short_name.as_str())).prompt()?
   {
     *short_name = inquire::Text::new("Write the Pipeline's short name (only for this project) (or hit `esc` to exit):")

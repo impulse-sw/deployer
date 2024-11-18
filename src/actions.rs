@@ -90,20 +90,21 @@ impl DescribedAction {
     &self,
     action: &BuildAction,
     langs: &Vec<ProgrammingLanguage>,
-    artifacts: &Vec<String>,
+    artifacts: &[String],
   ) -> anyhow::Result<BuildAction> {
     let mut action = action.clone();
-    if !langs.iter().position(|l| action.supported_langs.contains(l)).is_some() {
-      if !inquire::Confirm::new(
+    if 
+      !langs.iter().any(|l| action.supported_langs.contains(l)) && 
+      !inquire::Confirm::new(
         &format!(
           "Action `{}` may be not fully compatible with your project due to requirements (Action's supported langs: {:?}, your project's: {:?}). Use this Action anyway? If no, Action will be skipped. (y/n)",
           info2str_simple(&self.info),
           action.supported_langs,
           langs,
         )
-      ).prompt()? {
-        return Ok(BuildAction::default())
-      }
+      ).prompt()?
+    {
+      return Ok(BuildAction::default())
     }
     
     for cmd in &mut action.commands { *cmd = cmd.prompt_setup_for_project(&self.info, artifacts)?; }
@@ -114,7 +115,7 @@ impl DescribedAction {
   fn setup_projectclean_action(
     &self,
     action: &ProjectCleanAction,
-    artifacts: &Vec<String>,
+    artifacts: &[String],
   ) -> anyhow::Result<ProjectCleanAction> {
     let mut action = action.clone();
     for cmd in &mut action.additional_commands { *cmd = cmd.prompt_setup_for_project(&self.info, artifacts)?; }
@@ -124,22 +125,23 @@ impl DescribedAction {
   fn setup_packlike_action(
     &self,
     action: &PackAction,
-    targets: &Vec<TargetDescription>,
-    artifacts: &Vec<String>,
+    targets: &[TargetDescription],
+    artifacts: &[String],
   ) -> anyhow::Result<PackAction> {
     let mut action = action.clone();
     
-    if action.target.as_ref().is_some_and(|t| !targets.contains(&t)) {
-      if !inquire::Confirm::new(
+    if
+      action.target.as_ref().is_some_and(|t| !targets.contains(t)) &&
+      !inquire::Confirm::new(
         &format!(
           "Action `{}` may be not fully compatible with your project due to requirements (Action's target: {}, your project's: {:?}). Use this Action anyway? If no, Action will be skipped. (y/n)",
           info2str_simple(&self.info),
           target2str_simple(action.target.as_ref().unwrap()),
-          targets.iter().map(|t| target2str_simple(&t)).collect::<Vec<_>>(),
+          targets.iter().map(target2str_simple).collect::<Vec<_>>(),
         )
-      ).prompt()? {
-        return Ok(PackAction::default())
-      }
+      ).prompt()?
+    {
+      return Ok(PackAction::default())
     }
     
     for cmd in &mut action.commands { *cmd = cmd.prompt_setup_for_project(&self.info, artifacts)?; }
@@ -150,20 +152,21 @@ impl DescribedAction {
     &self,
     action: &DeployAction,
     deploy_toolkit: &Option<String>,
-    artifacts: &Vec<String>,
+    artifacts: &[String],
   ) -> anyhow::Result<DeployAction> {
     let mut action = action.clone();
-    if action.deploy_toolkit.as_ref().is_some_and(|l| deploy_toolkit.as_ref().is_some_and(|r| l.as_str() != r.as_str())) {
-      if !inquire::Confirm::new(
+    if
+      action.deploy_toolkit.as_ref().is_some_and(|l| deploy_toolkit.as_ref().is_some_and(|r| l.as_str() != r.as_str())) &&
+      !inquire::Confirm::new(
         &format!(
           "Action `{}` may be not fully compatible with your project due to requirements (Action's deploy toolkit: {}, your project's: {}). Use this Action anyway? If no, Action will be skipped. (y/n)",
           info2str_simple(&self.info),
           action.deploy_toolkit.as_ref().unwrap(),
           deploy_toolkit.as_ref().unwrap(),
         )
-      ).prompt()? {
-        return Ok(DeployAction::default())
-      }
+      ).prompt()?
+    {
+      return Ok(DeployAction::default())
     }
     
     for cmd in &mut action.commands { *cmd = cmd.prompt_setup_for_project(&self.info, artifacts)?; }
@@ -175,8 +178,8 @@ impl DescribedAction {
     &self,
     langs: &Vec<ProgrammingLanguage>,
     deploy_toolkit: &Option<String>,
-    targets: &Vec<TargetDescription>,
-    artifacts: &Vec<String>,
+    targets: &[TargetDescription],
+    artifacts: &[String],
   ) -> anyhow::Result<Self> {
     let action = match &self.action {
       Action::Custom(cmd) => Action::Custom(cmd.prompt_setup_for_project(&self.info, artifacts)?),
@@ -218,13 +221,13 @@ impl CustomCommand {
   pub(crate) fn prompt_setup_for_project(
     &self,
     info: &ActionInfo,
-    targets: &Vec<String>,
+    targets: &[String],
   ) -> anyhow::Result<Self> {
     use inquire::MultiSelect;
     
     if self.af_placeholder.is_none() { return Ok(self.clone()) }
     
-    let targets = targets.clone();
+    let targets = targets.to_owned();
     let selected = MultiSelect::new(&format!("Select artifacts to use with `{}` Action:", info2str_simple(info)), targets).prompt()?;
     
     let mut r = self.clone();
@@ -380,7 +383,7 @@ pub(crate) struct TargetDescription {
   pub(crate) arch: String,
   pub(crate) os: OsVariant,
   pub(crate) derivative: String,
-  pub(crate) version: OsVersion,
+  pub(crate) version: OsVersionSpecification,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
@@ -397,12 +400,12 @@ pub(crate) enum OsVariant {
 }
 
 #[derive(Deserialize, Serialize, Clone, PartialEq, Default, Debug)]
-pub(crate) enum OsVersion {
+pub(crate) enum OsVersionSpecification {
   #[default]
-  NotSpecified,
+  No,
   /// Даже если указана версия, при несоответствии версий может заработать.
-  WeakSpecified(String),
-  StrongSpecified(String),
+  Weak(String),
+  Strong(String),
 }
 
 pub(crate) type DeliveryAction = PackAction;
@@ -512,8 +515,7 @@ pub(crate) fn new_action(
   
   if let Some(from_file) = &args.from {
     let action = read_checked::<DescribedAction>(from_file).map_err(|e| {
-      println!("Can't read provided Action file due to: {}", e.to_string());
-      exit(1);
+      panic!("Can't read provided Action file due to: {}", e);
     }).unwrap();
     actions.insert(info2str_simple(&action.info), action.clone());
     return Ok(action)
@@ -524,10 +526,11 @@ pub(crate) fn new_action(
   
   let info = ActionInfo { short_name, version };
   
-  if actions.contains_key(&info2str_simple(&info)) {
-    if !Confirm::new(&format!("Actions Registry already have `{}` Action. Do you want to override it? (y/n)", info2str_simple(&info))).prompt()? {
-      exit(0);
-    }
+  if
+    actions.contains_key(&info2str_simple(&info)) &&
+    !Confirm::new(&format!("Actions Registry already have `{}` Action. Do you want to override it? (y/n)", info2str_simple(&info))).prompt()?
+  {
+    exit(0);
   }
   
   let name = Text::new("Write the Action's full name:").prompt()?;
@@ -734,7 +737,7 @@ pub(crate) fn new_action(
     },
     action_type @ ("Pre-build" | "Build" | "Post-build" | "Test") => {
       let supported_langs = select_programming_languages()?;
-      let commands = collect_multiple_commands(if action_type == "Pre-build" { false } else { true })?;
+      let commands = collect_multiple_commands(action_type != "Pre-build")?;
       
       let action = BuildAction {
         supported_langs,
@@ -947,14 +950,14 @@ pub(crate) fn collect_target() -> anyhow::Result<TargetDescription> {
   ).prompt()?;
   
   let version = match version_type {
-    "Not Specified" => OsVersion::NotSpecified,
+    "Not Specified" => OsVersionSpecification::No,
     "Weak Specified" => {
       let ver = Text::new("Enter version:").prompt()?;
-      OsVersion::WeakSpecified(ver)
+      OsVersionSpecification::Weak(ver)
     },
     "Strong Specified" => {
       let ver = Text::new("Enter version:").prompt()?;
-      OsVersion::StrongSpecified(ver)
+      OsVersionSpecification::Strong(ver)
     },
     _ => unreachable!(),
   };

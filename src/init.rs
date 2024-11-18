@@ -25,7 +25,7 @@ fn collect_artifacts() -> anyhow::Result<Vec<String>> {
   Ok(v)
 }
 
-fn collect_af_inplacements(artifacts: &Vec<String>) -> anyhow::Result<Vec<(String, String)>> {
+fn collect_af_inplacements(artifacts: &[String]) -> anyhow::Result<Vec<(String, String)>> {
   use inquire::{Confirm, Select, Text};
   
   const FIRST_PROMPT: &str = "Do you want to create artifact inplacement from build directory to your project's location (inside `artifacts` subfolder)? (y/n)";
@@ -35,7 +35,7 @@ fn collect_af_inplacements(artifacts: &Vec<String>) -> anyhow::Result<Vec<(Strin
   let mut prompt = FIRST_PROMPT;
   
   while Confirm::new(prompt).prompt()? {
-    let from = Select::new("Select project's artifact:", artifacts.clone()).prompt()?;
+    let from = Select::new("Select project's artifact:", artifacts.to_owned()).prompt()?;
     let to = Text::new("Enter relative path of artifact inplacement (inside `artifacts` subfolder):").prompt()?;
     v.push((from, to));
     prompt = ANOTHER_PROMPT;

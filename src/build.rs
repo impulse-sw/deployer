@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use colored::Colorize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use uuid::Uuid;
 
@@ -18,7 +18,7 @@ pub(crate) fn build(
 ) -> anyhow::Result<()> {
   if
     let Some(pipeline_tag) = &args.pipeline_tag &&
-    config.pipelines.iter().position(|p| p.title.as_str() == pipeline_tag.as_str()).is_none()
+    !config.pipelines.iter().any(|p| p.title.as_str() == pipeline_tag.as_str())
   {
     panic!("There is no such Pipeline set up for this project. Maybe, you've forgotten `deployer with {{pipeline-short-name-and-ver}}`?");
   }
@@ -26,17 +26,17 @@ pub(crate) fn build(
   let mut build_path = PathBuf::new();
   build_path.push(cache_dir);
   build_path.push(DEPLOY_CACHE_SUBDIR);
-  std::fs::create_dir_all(build_path.as_path()).expect(format!("Can't create `{:?}` folder!", build_path).as_str());
+  std::fs::create_dir_all(build_path.as_path()).unwrap_or_else(|_| panic!("Can't create `{:?}` folder!", build_path));
   
   let curr_dir = std::env::current_dir().expect("Can't get current dir!");
   let artifacts_dir = curr_dir.join(DEPLOY_ARTIFACTS_SUBDIR);
-  std::fs::create_dir_all(artifacts_dir.as_path()).expect(format!("Can't create `{:?}` folder!", artifacts_dir).as_str());
+  std::fs::create_dir_all(artifacts_dir.as_path()).unwrap_or_else(|_| panic!("Can't create `{:?}` folder!", build_path));
   
   if config.last_build.is_none() { args.fresh = true; }
   
   let uuid = match args.fresh {
     true => {
-      let uuid = format!("deploy-build-{}", Uuid::new_v4().to_string());
+      let uuid = format!("deploy-build-{}", Uuid::new_v4());
       config.builds.push(uuid.clone());
       config.last_build = Some(uuid.clone());
       uuid
@@ -84,12 +84,10 @@ pub(crate) fn build(
     let artifact_path = build_path.join(from);
     if !std::fs::exists(artifact_path.clone())? {
       panic!("There is no `{:?}` artifact!", artifact_path);
-    } else {
-      if artifact_path.as_path().is_dir() {
-        copy_all(artifact_path.as_path(), artifacts_dir.join(to).join(artifact_path.file_name().unwrap()), &ignore)?;
-      } else if artifact_path.as_path().is_file() {
-        copy_all(artifact_path.as_path(), artifacts_dir.join(to).as_path(), &ignore)?;
-      }
+    } else if artifact_path.as_path().is_dir() {
+      copy_all(artifact_path.as_path(), artifacts_dir.join(to).join(artifact_path.file_name().unwrap()), &ignore)?;
+    } else if artifact_path.as_path().is_file() {
+      copy_all(artifact_path.as_path(), artifacts_dir.join(to).as_path(), &ignore)?;
     }
   }
   
@@ -101,7 +99,7 @@ pub(crate) fn build(
 fn execute_pipeline(
   silent: bool,
   pipeline: &DescribedPipeline,
-  build_dir: &PathBuf,
+  build_dir: &Path,
 ) -> anyhow::Result<()> {
   use std::io::{stdout, Write};
   use std::time::Instant;
@@ -149,11 +147,11 @@ fn execute_pipeline(
 }
 
 trait Execute {
-  fn execute(&self, curr_dir: &PathBuf) -> anyhow::Result<(bool, Vec<String>)>;
+  fn execute(&self, curr_dir: &Path) -> anyhow::Result<(bool, Vec<String>)>;
 }
 
 impl Execute for CustomCommand {
-  fn execute(&self, curr_dir: &PathBuf) -> anyhow::Result<(bool, Vec<String>)> {
+  fn execute(&self, curr_dir: &Path) -> anyhow::Result<(bool, Vec<String>)> {
     let mut output = vec![];
     
     if let Some(af_placeholder) = &self.af_placeholder {
@@ -210,7 +208,7 @@ impl Execute for CustomCommand {
 }
 
 impl Execute for ProjectCleanAction {
-  fn execute(&self, curr_dir: &PathBuf) -> anyhow::Result<(bool, Vec<String>)> {
+  fn execute(&self, curr_dir: &Path) -> anyhow::Result<(bool, Vec<String>)> {
     let mut total_output = vec![];
     
     for cmd in &self.additional_commands {
@@ -222,12 +220,12 @@ impl Execute for ProjectCleanAction {
       }
     }
     
-    return Ok((true, total_output))
+    Ok((true, total_output))
   }
 }
 
 impl Execute for BuildAction {
-  fn execute(&self, curr_dir: &PathBuf) -> anyhow::Result<(bool, Vec<String>)> {
+  fn execute(&self, curr_dir: &Path) -> anyhow::Result<(bool, Vec<String>)> {
     let mut total_output = vec![];
     
     for cmd in &self.commands {
@@ -239,12 +237,12 @@ impl Execute for BuildAction {
       }
     }
     
-    return Ok((true, total_output))
+    Ok((true, total_output))
   }
 }
 
 impl Execute for PackAction {
-  fn execute(&self, curr_dir: &PathBuf) -> anyhow::Result<(bool, Vec<String>)> {
+  fn execute(&self, curr_dir: &Path) -> anyhow::Result<(bool, Vec<String>)> {
     let mut total_output = vec![];
     
     for cmd in &self.commands {
@@ -256,13 +254,13 @@ impl Execute for PackAction {
       }
     }
     
-    return Ok((true, total_output))
+    Ok((true, total_output))
   }
 }
 
 
 impl Execute for DeployAction {
-  fn execute(&self, curr_dir: &PathBuf) -> anyhow::Result<(bool, Vec<String>)> {
+  fn execute(&self, curr_dir: &Path) -> anyhow::Result<(bool, Vec<String>)> {
     let mut total_output = vec![];
     
     for cmd in &self.commands {
@@ -274,7 +272,7 @@ impl Execute for DeployAction {
       }
     }
     
-    return Ok((true, total_output))
+    Ok((true, total_output))
   }
 }
 

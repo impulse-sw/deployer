@@ -2,7 +2,7 @@ use inquire::CustomType;
 use regex::Regex;
 use serde::Deserialize;
 
-use crate::actions::{DependencyInfo, TargetDescription, OsVariant, OsVersion};
+use crate::actions::{DependencyInfo, TargetDescription, OsVariant, OsVersionSpecification};
 
 #[macro_export]
 macro_rules! hmap {
@@ -11,7 +11,7 @@ macro_rules! hmap {
   };
 }
 
-pub(crate) fn tags_custom_type<'a>(message: &'a str) -> CustomType<'a, Vec<String>> {
+pub(crate) fn tags_custom_type(message: &str) -> CustomType<'_, Vec<String>> {
   use inquire::ui::RenderConfig;
   
   CustomType {
@@ -37,13 +37,13 @@ pub(crate) fn target2str_simple(t: &TargetDescription) -> String {
     OsVariant::UnixLike(nix) => &format!("unix-{}", nix),
     OsVariant::Windows => "windows",
     OsVariant::macOS => "macos",
-    OsVariant::Other(other) => &other,
+    OsVariant::Other(other) => other,
   };
   
   let os_ver = match &t.version {
-    OsVersion::NotSpecified => "any",
-    OsVersion::WeakSpecified(ver) => &format!("^{}", ver),
-    OsVersion::StrongSpecified(ver) => &ver,
+    OsVersionSpecification::No => "any",
+    OsVersionSpecification::Weak(ver) => &format!("^{}", ver),
+    OsVersionSpecification::Strong(ver) => ver,
   };
   
   format!("{}/{}@{}@{}", t.arch, os, t.derivative, os_ver)
@@ -77,7 +77,7 @@ where
   use serde::de::Error;
   String::deserialize(deserializer).and_then(|string| {
     let vals = string.split('@').collect::<Vec<_>>();
-    if let Some(short_name) = vals.get(0) && let Some(version) = vals.get(1) {
+    if let Some(short_name) = vals.first() && let Some(version) = vals.get(1) {
       Ok(DependencyInfo { short_name: short_name.to_string(), version: version.to_string() })
     } else {
       Err(Error::custom("Can't deserialize information!"))

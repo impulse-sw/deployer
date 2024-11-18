@@ -44,8 +44,9 @@ compile_error!("`cc-deploy` can't work with non-Unix systems.");
 
 fn main() {
   std::panic::set_hook(Box::new(|e| {
-    println!("");
-    println!("An error occured: {}", e.to_string());
+    println!();
+    println!("An error occured: {}", e);
+    std::process::exit(1);
   }));
   
   let args = Cli::parse();

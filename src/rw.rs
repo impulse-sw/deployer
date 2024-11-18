@@ -11,10 +11,7 @@ pub(crate) fn read<T: DeserializeOwned + Default>(folder: impl AsRef<Path>, file
   path.push(folder);
   path.push(file);
   
-  match read_checked(path) {
-    Err(_) => T::default(),
-    Ok(val) => val,
-  }
+  read_checked(path).unwrap_or_default()
 }
 
 pub(crate) fn read_checked<T: DeserializeOwned>(filepath: impl AsRef<Path>) -> anyhow::Result<T> {
@@ -46,20 +43,10 @@ pub(crate) fn write<T: Serialize>(folder: impl AsRef<Path>, file: impl AsRef<Pat
     Ok(_) => (),
     Err(_) => {
       log(format!("Can't save `{:?}` config file due to serialization error!", file.as_ref().as_os_str()));
-      ()
     },
   }
 }
 
-// pub(crate) fn copy_file(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> anyhow::Result<()> {
-//   log(format!("From `{:?}` to `{:?}` - copying file...", src.as_ref(), dst.as_ref()));
-//   
-//   if let Some(parent) = dst.as_ref().parent() {
-//     std::fs::create_dir_all(parent).unwrap();
-//   }
-//   std::fs::copy(src.as_ref(), dst.as_ref()).unwrap();
-//   return Ok(())
-// }
 
 pub(crate) fn copy_all(src: impl AsRef<Path>, dst: impl AsRef<Path>, ignore: &[&str]) -> anyhow::Result<()> {
   if src.as_ref().is_file() {
@@ -101,7 +88,6 @@ pub(crate) fn symlink(src: impl AsRef<Path>, dst: impl AsRef<Path>) {
     Ok(_) => (),
     Err(_) => {
       log(format!("Skip `{}`", src.as_ref().to_str().unwrap()));
-      ()
     },
   }
 }
