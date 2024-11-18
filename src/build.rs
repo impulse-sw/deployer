@@ -293,6 +293,7 @@ pub(crate) fn clean_builds(
     build_path.push(build);
     let _ = std::fs::remove_dir_all(build_path);
   }
+  config.builds.clear();
   
   if args.include_artifacts {
     let curr_dir = std::env::current_dir()?;
