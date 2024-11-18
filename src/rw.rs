@@ -51,16 +51,28 @@ pub(crate) fn write<T: Serialize>(folder: impl AsRef<Path>, file: impl AsRef<Pat
   }
 }
 
-pub(crate) fn copy_all(src: impl AsRef<Path>, dst: impl AsRef<Path>, ignore: &[&str]) {
-  std::fs::create_dir_all(&dst).expect(format!("Can't create `{:?}` folder!", dst.as_ref()).as_str());
-  
+// pub(crate) fn copy_file(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> anyhow::Result<()> {
+//   log(format!("From `{:?}` to `{:?}` - copying file...", src.as_ref(), dst.as_ref()));
+//   
+//   if let Some(parent) = dst.as_ref().parent() {
+//     std::fs::create_dir_all(parent).unwrap();
+//   }
+//   std::fs::copy(src.as_ref(), dst.as_ref()).unwrap();
+//   return Ok(())
+// }
+
+pub(crate) fn copy_all(src: impl AsRef<Path>, dst: impl AsRef<Path>, ignore: &[&str]) -> anyhow::Result<()> {
   if src.as_ref().is_file() {
-    std::fs::copy(src.as_ref(), dst.as_ref().join(src.as_ref().file_name().unwrap())).unwrap();
-    return
+    if let Some(parent) = dst.as_ref().parent() {
+      std::fs::create_dir_all(parent)?;
+    }
+    std::fs::copy(src.as_ref(), dst.as_ref())?;
+    return Ok(())
   }
+  std::fs::create_dir_all(&dst)?;
   
-  for entry in std::fs::read_dir(src).unwrap() {
-    let entry = entry.unwrap();
+  for entry in std::fs::read_dir(src)? {
+    let entry = entry?;
     let name = entry.file_name();
     let name = name.to_str().unwrap_or("");
     
@@ -68,16 +80,18 @@ pub(crate) fn copy_all(src: impl AsRef<Path>, dst: impl AsRef<Path>, ignore: &[&
     
     log(format!("-> {}", name));
     
-    let ty = entry.file_type().unwrap();
+    let ty = entry.file_type()?;
     let d = dst.as_ref().join(entry.file_name());
     if ty.is_dir() {
-      copy_all(entry.path(), d, ignore);
+      copy_all(entry.path(), d, ignore)?;
     } else if ty.is_file() {
-      std::fs::copy(entry.path(), d).unwrap();
+      std::fs::copy(entry.path(), d)?;
     } else if ty.is_symlink() {
-      symlink(std::fs::canonicalize(name).expect("There is no such point symlink links to!"), d);
+      symlink(std::fs::canonicalize(name)?, d);
     }
   }
+  
+  Ok(())
 }
 
 pub(crate) fn symlink(src: impl AsRef<Path>, dst: impl AsRef<Path>) {

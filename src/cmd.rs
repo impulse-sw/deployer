@@ -141,6 +141,8 @@ pub(crate) struct CleanArgs {
 
 #[derive(Args, Debug)]
 pub(crate) struct BuildArgs {
+  /// {short-name}
+  pub(crate) pipeline_tag: Option<String>,
   /// Fresh build
   #[arg(short, long)]
   pub(crate) fresh: bool,
@@ -150,6 +152,7 @@ pub(crate) struct BuildArgs {
   /// With cache too, but copy cache files and folders instead of symlinking
   #[arg(long)]
   pub(crate) copy_cache: bool,
-  /// {short-name}
-  pub(crate) pipeline_tag: Option<String>,
+  /// Disable output from Actions
+  #[arg(short, long)]
+  pub(crate) silent: bool,
 }

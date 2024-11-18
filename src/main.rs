@@ -1,5 +1,5 @@
-#![feature(let_chains, once_wait)]
-// #![deny(warnings)]
+#![feature(let_chains, once_wait, string_from_utf8_lossy_owned)]
+#![deny(warnings)]
 
 #[cfg(feature = "tests")]
 mod tests;
@@ -11,7 +11,6 @@ mod utils;
 
 mod init;
 mod build;
-mod clean;
 
 mod actions;
 mod pipelines;
@@ -26,11 +25,10 @@ use crate::rw::{read, write, VERBOSE};
 use crate::tests::tests;
 
 use crate::init::init;
-// use build::build;
-// use clean::clean;
+use crate::build::{build, clean_builds};
 
 use clap::Parser;
-use dirs::{config_dir, cache_dir, data_dir};
+use dirs::{config_dir, cache_dir};
 use mimalloc::MiMalloc;
 
 #[global_allocator]
@@ -77,34 +75,26 @@ fn main() {
   } else {
     args.config_folder.as_ref().unwrap().to_string()
   };
-  let data_folder = if args.data_folder.is_none() {
-    data_dir()
-      .expect("Can't get `data` directory's location automatically, please specify one.")
-      .join("deployer")
-      .to_str()
-      .expect("Can't convert `PathBuf` to `str` for `data` folder!")
-      .to_string()
-  } else {
-    args.data_folder.as_ref().unwrap().to_string()
-  };
   
   // Чтение конфигов
   let mut globals = read::<DeployerGlobalConfig>(&config_folder, DEPLOY_GLOBAL_CONF_FILE);
   let mut config = read::<DeployerProjectOptions>(".", DEPLOY_CONF_FILE);
   
   match args.r#type {
-    DeployerExecType::Ls(ListType::Actions) => list_actions(&mut globals),
+    DeployerExecType::Ls(ListType::Actions) => list_actions(&globals),
     DeployerExecType::New(NewType::Action(args)) => { let _ = new_action(&mut globals, &args).unwrap(); },
-    DeployerExecType::Cat(CatType::Action(args)) => cat_action(&mut globals, &args).unwrap(),
+    DeployerExecType::Cat(CatType::Action(args)) => cat_action(&globals, &args).unwrap(),
     DeployerExecType::Rm(RemoveType::Action) => remove_action(&mut globals).unwrap(),
     
-    DeployerExecType::Ls(ListType::Pipelines) => list_pipelines(&mut globals).unwrap(),
+    DeployerExecType::Ls(ListType::Pipelines) => list_pipelines(&globals).unwrap(),
     DeployerExecType::New(NewType::Pipeline(args)) => new_pipeline(&mut globals, &args).unwrap(),
-    DeployerExecType::Cat(CatType::Pipeline(args)) => cat_pipeline(&mut globals, &args).unwrap(),
+    DeployerExecType::Cat(CatType::Pipeline(args)) => cat_pipeline(&globals, &args).unwrap(),
     DeployerExecType::Rm(RemoveType::Pipeline) => remove_pipeline(&mut globals).unwrap(),
     
     DeployerExecType::Init(_) => init(&mut globals, &mut config).unwrap(),
-    DeployerExecType::With(args) => assign_pipeline_to_project(&mut globals, &mut config, &args).unwrap(),
+    DeployerExecType::With(args) => assign_pipeline_to_project(&globals, &mut config, &args).unwrap(),
+    DeployerExecType::Build(mut args) => build(&mut config, &cache_folder, &mut args).unwrap(),
+    DeployerExecType::CleanBuilds(args) => clean_builds(&cache_folder, &args).unwrap(),
     
     #[cfg(feature = "tests")]
     DeployerExecType::Tests => tests().unwrap(),

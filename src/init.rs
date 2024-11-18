@@ -25,6 +25,25 @@ fn collect_artifacts() -> anyhow::Result<Vec<String>> {
   Ok(v)
 }
 
+fn collect_af_inplacements(artifacts: &Vec<String>) -> anyhow::Result<Vec<(String, String)>> {
+  use inquire::{Confirm, Select, Text};
+  
+  const FIRST_PROMPT: &str = "Do you want to create artifact inplacement from build directory to your project's location (inside `artifacts` subfolder)? (y/n)";
+  const ANOTHER_PROMPT: &str = "Add one more artifact inplacement? (y/n)";
+  
+  let mut v = vec![];
+  let mut prompt = FIRST_PROMPT;
+  
+  while Confirm::new(prompt).prompt()? {
+    let from = Select::new("Select project's artifact:", artifacts.clone()).prompt()?;
+    let to = Text::new("Enter relative path of artifact inplacement (inside `artifacts` subfolder):").prompt()?;
+    v.push((from, to));
+    prompt = ANOTHER_PROMPT;
+  }
+  
+  Ok(v)
+}
+
 pub(crate) fn init(
   globals: &mut DeployerGlobalConfig,
   config: &mut DeployerProjectOptions,
@@ -50,6 +69,7 @@ pub(crate) fn init(
   config.deploy_toolkit = Text::new("Specify your deploy toolkit (`docker`, `docker-compose`, `podman`, `k8s`, etc.) (or hit `esc`):").prompt_skippable()?;
   config.targets = collect_targets()?;
   config.artifacts = collect_artifacts()?;
+  config.inplace_artifacts_into_project_root = collect_af_inplacements(&config.artifacts)?;
   
   println!("Setup is completed. Don't forget to assign at least one Pipeline to the project to build/deploy!");
   

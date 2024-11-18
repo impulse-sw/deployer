@@ -25,7 +25,7 @@ pub(crate) type PipelineInfo = DependencyInfo;
 
 /// Перечисляет все доступные пайплайны.
 pub(crate) fn list_pipelines(
-  globals: &mut DeployerGlobalConfig,
+  globals: &DeployerGlobalConfig,
 ) -> anyhow::Result<()> {
   println!("Available Pipelines in Deployer's Registry:");
   
@@ -210,7 +210,7 @@ pub(crate) fn remove_pipeline(
 }
 
 pub(crate) fn cat_pipeline(
-  globals: &mut DeployerGlobalConfig,
+  globals: &DeployerGlobalConfig,
   args: &CatPipelineArgs,
 ) -> anyhow::Result<()> {
   let pipeline = match globals.pipelines_registry.get(&args.pipeline_short_info_and_version) {
@@ -225,7 +225,7 @@ pub(crate) fn cat_pipeline(
 }
 
 pub(crate) fn assign_pipeline_to_project(
-  globals: &mut DeployerGlobalConfig,
+  globals: &DeployerGlobalConfig,
   config: &mut DeployerProjectOptions,
   args: &WithPipelineArgs,
 ) -> anyhow::Result<()> {
@@ -262,7 +262,7 @@ fn specify_short_name(
   short_name: &mut String,
 ) -> anyhow::Result<()> {
   while
-    config.pipelines.iter().fold(false, |acc, p| acc || (p.title.as_str() == short_name.as_str())) &&
+    config.pipelines.iter().position(|p| p.title.as_str() == short_name).is_some() &&
     !inquire::Confirm::new(&format!("Do you want to overwrite an existing pipeline `{}` for this project? (y/n)", short_name.as_str())).prompt()?
   {
     *short_name = inquire::Text::new("Write the Pipeline's short name (only for this project) (or hit `esc` to exit):")
@@ -277,15 +277,7 @@ fn remove_old_pipeline(
   config: &mut DeployerProjectOptions,
   short_name: &str,
 ) {
-  if let Some(i) = config.pipelines.iter().fold((None, 0), |acc, p| {
-    let i = if p.title.as_str() == short_name {
-      Some(acc.1)
-    } else {
-      acc.0
-    };
-    
-    (i, acc.1 + 1)
-  }).0 {
+  if let Some(i) = config.pipelines.iter().position(|p| p.title.as_str() == short_name) {
     config.pipelines.remove(i);
   }
 }

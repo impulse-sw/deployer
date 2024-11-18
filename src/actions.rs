@@ -93,7 +93,7 @@ impl DescribedAction {
     artifacts: &Vec<String>,
   ) -> anyhow::Result<BuildAction> {
     let mut action = action.clone();
-    if !langs.iter().fold(true, |acc, lang| acc && action.supported_langs.contains(lang)) {
+    if !langs.iter().position(|l| action.supported_langs.contains(l)).is_some() {
       if !inquire::Confirm::new(
         &format!(
           "Action `{}` may be not fully compatible with your project due to requirements (Action's supported langs: {:?}, your project's: {:?}). Use this Action anyway? If no, Action will be skipped. (y/n)",
@@ -445,7 +445,7 @@ pub(crate) struct UseArtifactAction {
 
 /// Перечисляет все доступные действия.
 pub(crate) fn list_actions(
-  globals: &mut DeployerGlobalConfig,
+  globals: &DeployerGlobalConfig,
 ) {
   println!("Available Actions in Deployer's Registry:");
   
@@ -590,7 +590,7 @@ pub(crate) fn new_action(
       let files = Text::new("Enter comma-separated list of files to apply placeholder to:")
         .prompt()
         .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())?;
-      let additional_commands = collect_multiple_commands()?;
+      let additional_commands = collect_multiple_commands(false)?;
       
       Action::InitWithTemplate(TemplateInitializationAction {
         template_folder,
@@ -734,7 +734,7 @@ pub(crate) fn new_action(
     },
     action_type @ ("Pre-build" | "Build" | "Post-build" | "Test") => {
       let supported_langs = select_programming_languages()?;
-      let commands = collect_multiple_commands()?;
+      let commands = collect_multiple_commands(if action_type == "Pre-build" { false } else { true })?;
       
       let action = BuildAction {
         supported_langs,
@@ -753,7 +753,7 @@ pub(crate) fn new_action(
       let to_remove = Text::new("Enter comma-separated list of paths to remove:")
         .prompt()
         .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())?;
-      let additional_commands = collect_multiple_commands()?;
+      let additional_commands = collect_multiple_commands(true)?;
       
       Action::ProjectClean(ProjectCleanAction {
         to_remove,
@@ -762,7 +762,7 @@ pub(crate) fn new_action(
     },
     action_type @ ("Pack" | "Deliver" | "Install") => {
       let target = collect_target()?;
-      let commands = collect_multiple_commands()?;
+      let commands = collect_multiple_commands(true)?;
       
       let action = PackAction {
         target: Some(target),
@@ -779,7 +779,7 @@ pub(crate) fn new_action(
     action_type @ ("Configure deploy" | "Deploy" | "Post-deploy") => {
       let deploy_toolkit = Text::new("Enter deploy toolkit name (or hit `esc`):").prompt_skippable()?;
       let tags = tags_custom_type("Enter deploy tags:").prompt()?;
-      let commands = collect_multiple_commands()?;
+      let commands = collect_multiple_commands(true)?;
       
       let action = DeployAction {
         deploy_toolkit,
@@ -796,7 +796,7 @@ pub(crate) fn new_action(
     },
     "Observe" => {
       let tags = tags_custom_type("Enter observe tags:").prompt()?;
-      let commands = collect_multiple_commands()?;
+      let commands = collect_multiple_commands(true)?;
       
       Action::Observe(ObserveAction { tags, commands })
     },
@@ -860,12 +860,12 @@ pub(crate) fn new_custom_command(with_af: bool) -> anyhow::Result<CustomCommand>
 }
 
 /// Создаёт несколько новых команд.
-fn collect_multiple_commands() -> anyhow::Result<Vec<CustomCommand>> {
+fn collect_multiple_commands(with_af: bool) -> anyhow::Result<Vec<CustomCommand>> {
   use inquire::Confirm;
   
   let mut commands = Vec::new();
   while Confirm::new("Add command? (y/n)").prompt()? {
-    commands.push(new_custom_command(true)?);
+    commands.push(new_custom_command(with_af)?);
   }
   Ok(commands)
 }
@@ -983,7 +983,7 @@ fn collect_key_value_pairs(prompt: &str) -> anyhow::Result<HashMap<String, Strin
 }
 
 pub(crate) fn cat_action(
-  globals: &mut DeployerGlobalConfig,
+  globals: &DeployerGlobalConfig,
   args: &CatActionArgs,
 ) -> anyhow::Result<()> {
   let action = match globals.actions_registry.get(&args.action_short_info_and_version) {

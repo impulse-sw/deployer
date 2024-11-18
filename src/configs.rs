@@ -42,6 +42,8 @@ pub(crate) struct DeployerProjectOptions {
   
   /// Артефакты
   pub(crate) artifacts: Vec<String>,
+  /// Правила размещения артефактов
+  pub(crate) inplace_artifacts_into_project_root: Vec<(String, String)>,
 }
 
 /// Глобальная конфигурация Деплойера.
