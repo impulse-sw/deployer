@@ -224,6 +224,31 @@ pub(crate) fn cat_pipeline(
   Ok(())
 }
 
+fn reorder_pipelines_in_project(
+  pipelines_unordered: Vec<DescribedPipeline>,
+) -> anyhow::Result<Vec<DescribedPipeline>> {
+  use inquire::ReorderableList;
+  
+  let mut h = hmap!();
+  let mut k = vec![];
+  
+  for pipeline in pipelines_unordered {
+    let key = format!("{} - {}", info2str_simple(&pipeline.info), pipeline.title);
+    k.push(key.clone());
+    h.insert(key, pipeline);
+  }
+  
+  println!("The `build` action without specifying Pipeline's short name will execute all Pipelines. Make sure that your Pipelines are sorted the way you need them.");
+  let reordered = ReorderableList::new("Reorder Pipelines inside your project:", k).prompt()?;
+  
+  let mut pipelines_ordered = vec![];
+  for key in reordered {
+    pipelines_ordered.push((*h.get(&key).unwrap()).clone());
+  }
+  
+  Ok(pipelines_ordered)
+}
+
 pub(crate) fn assign_pipeline_to_project(
   globals: &DeployerGlobalConfig,
   config: &mut DeployerProjectOptions,
@@ -252,6 +277,9 @@ pub(crate) fn assign_pipeline_to_project(
   
   remove_old_pipeline(config, &short_name);
   config.pipelines.push(pipeline);
+  
+  config.pipelines = reorder_pipelines_in_project(config.pipelines.clone())?;
+  
   println!("Pipeline is successfully set up for this project.");
   
   Ok(())
