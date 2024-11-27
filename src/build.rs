@@ -53,15 +53,20 @@ pub(crate) fn build(
   if args.with_cache {
     match args.copy_cache {
       false => {
-        symlink(curr_dir.join("Cargo.lock"), build_path.join("Cargo.lock"));
-        log("-> Cargo.lock");
-        symlink(curr_dir.join("target"), build_path.join("target"));
-        log("-> target/*");
+        for cache_item in &config.cache_files {
+          symlink(curr_dir.join(cache_item.as_str()), build_path.join(cache_item.as_str()));
+          log(format!("-> {}", cache_item.as_str()));
+        }
       },
       true => {
-        std::fs::copy(curr_dir.join("Cargo.lock"), build_path.join("Cargo.lock")).unwrap();
-        log("-> Cargo.lock");
-        copy_all(curr_dir.join("target"), build_path.as_path(), &[".git", "deploy-config.json", DEPLOY_ARTIFACTS_SUBDIR, &uuid])?;
+        for cache_item in &config.cache_files {
+          copy_all(
+            curr_dir.join(cache_item.as_str()),
+            build_path.join(cache_item.as_str()),
+            &[".git", "deploy-config.json", DEPLOY_ARTIFACTS_SUBDIR, &uuid]
+          )?;
+          log(format!("-> {}", cache_item.as_str()));
+        }
       },
     }
   }
