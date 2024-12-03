@@ -177,6 +177,7 @@ fn compose_output(
   bash_c_info: String,
   stdout: String,
   stderr: String,
+  success: bool,
 ) -> Vec<String> {
   let mut output = vec![];
   
@@ -193,7 +194,7 @@ fn compose_output(
   }
   if !stderr.trim().is_empty() {
     let total = stderr.chars().filter(|c| *c == '\n').count();
-    if total != 0 { output.push(format!("{}", "Errors:".red())); }
+    if total != 0 && !success { output.push(format!("{}", "Errors:".red().bold())); }
     
     for (i, line) in stderr.split('\n').enumerate() {
       if i == total && line.trim().is_empty() { break }
@@ -230,7 +231,7 @@ impl Execute for CustomCommand {
         
         let stdout_strs = String::from_utf8_lossy_owned(command_output.stdout);
         let stderr_strs = String::from_utf8_lossy_owned(command_output.stderr);
-        output.extend_from_slice(&compose_output(bash_c_info.to_string(), stdout_strs, stderr_strs));
+        output.extend_from_slice(&compose_output(bash_c_info.to_string(), stdout_strs, stderr_strs, command_output.status.success()));
         
         if !self.ignore_fails && !command_output.status.success() {
           return Ok((false, output))
@@ -252,7 +253,7 @@ impl Execute for CustomCommand {
       
       let stdout_strs = String::from_utf8_lossy_owned(command_output.stdout);
       let stderr_strs = String::from_utf8_lossy_owned(command_output.stderr);
-      output.extend_from_slice(&compose_output(bash_c_info.to_string(), stdout_strs, stderr_strs));
+      output.extend_from_slice(&compose_output(bash_c_info.to_string(), stdout_strs, stderr_strs, command_output.status.success()));
       
       if !self.ignore_fails && !command_output.status.success() {
         return Ok((false, output))
