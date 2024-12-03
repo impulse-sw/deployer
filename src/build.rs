@@ -14,8 +14,8 @@ use crate::utils::get_current_working_dir;
 
 fn enplace_artifacts(
   config: &DeployerProjectOptions,
-  build_path: &PathBuf,
-  artifacts_dir: &PathBuf,
+  build_path: &Path,
+  artifacts_dir: &Path,
   panic_when_not_found: bool,
 ) -> anyhow::Result<()> {
   let mut ignore = vec![DEPLOY_ARTIFACTS_SUBDIR];
@@ -25,9 +25,7 @@ fn enplace_artifacts(
     let artifact_path = build_path.join(from);
     if !std::fs::exists(artifact_path.clone())? {
       if panic_when_not_found { panic!("There is no `{:?}` artifact!", artifact_path); }
-    } else if artifact_path.as_path().is_dir() {
-      copy_all(artifact_path.as_path(), artifacts_dir.join(to).as_path(), &ignore)?;
-    } else if artifact_path.as_path().is_file() {
+    } else if artifact_path.as_path().is_dir() || artifact_path.as_path().is_file() {
       copy_all(artifact_path.as_path(), artifacts_dir.join(to).as_path(), &ignore)?;
     }
   }
@@ -73,7 +71,7 @@ pub(crate) fn build(
   build_path.push(uuid.clone());
   
   copy_all(".", build_path.as_path(), &["Cargo.lock", "target", ".git", DEPLOY_ARTIFACTS_SUBDIR, &uuid])?;
-  write(&get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
+  write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
   
   if args.with_cache {
     match args.copy_cache {
@@ -119,7 +117,7 @@ fn execute_pipeline(
   silent: bool,
   pipeline: &DescribedPipeline,
   build_dir: &Path,
-  artifacts_dir: &PathBuf,
+  artifacts_dir: &Path,
 ) -> anyhow::Result<()> {
   use std::io::{stdout, Write};
   use std::time::Instant;
@@ -139,8 +137,8 @@ fn execute_pipeline(
       Action::Pack(a) | Action::Deliver(a) | Action::Install(a) => a.execute(build_dir)?,
       Action::ConfigureDeploy(a) | Action::Deploy(a) | Action::PostDeploy(a) => a.execute(build_dir)?,
       Action::ForceArtifactsEnplace => {
-        enplace_artifacts(config, &build_dir.to_path_buf(), &artifacts_dir, false)?;
-        enplace_artifacts(config, &build_dir.to_path_buf(), &build_dir.to_path_buf().join(DEPLOY_ARTIFACTS_SUBDIR), false)?;
+        enplace_artifacts(config, build_dir, artifacts_dir, false)?;
+        enplace_artifacts(config, build_dir, &build_dir.to_path_buf().join(DEPLOY_ARTIFACTS_SUBDIR), false)?;
         (true, vec!["Artifacts are enplaced successfully.".into()])
       },
       _ => {

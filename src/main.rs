@@ -106,5 +106,5 @@ fn main() {
   
   // Запись конфигов
   write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
-  write(&get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
+  write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
 }
