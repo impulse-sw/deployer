@@ -11,6 +11,10 @@ macro_rules! hmap {
   };
 }
 
+pub(crate) fn get_current_working_dir() -> std::io::Result<std::path::PathBuf> {
+  std::env::current_dir()
+}
+
 pub(crate) fn tags_custom_type(message: &str) -> CustomType<'_, Vec<String>> {
   use inquire::ui::RenderConfig;
   

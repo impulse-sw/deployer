@@ -71,6 +71,11 @@ pub(crate) fn copy_all(src: impl AsRef<Path>, dst: impl AsRef<Path>, ignore: &[&
     let d = dst.as_ref().join(entry.file_name());
     if ty.is_dir() {
       copy_all(entry.path(), d, ignore)?;
+    } else if name == "deploy-config.json" {
+      
+      log(format!("Symlinking `deploy-config.json` from {:?} to {:?}", entry.path(), d));
+      
+      symlink(std::fs::canonicalize(entry.path())?, d);
     } else if ty.is_file() {
       std::fs::copy(entry.path(), d)?;
     } else if ty.is_symlink() {
@@ -86,8 +91,8 @@ pub(crate) fn symlink(src: impl AsRef<Path>, dst: impl AsRef<Path>) {
   
   match os_symlink(src.as_ref(), dst) {
     Ok(_) => (),
-    Err(_) => {
-      log(format!("Skip `{}`", src.as_ref().to_str().unwrap()));
+    Err(e) => {
+      log(format!("Skip `{}` due to: {:?}", src.as_ref().to_str().unwrap(), e));
     },
   }
 }

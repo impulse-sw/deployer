@@ -4,12 +4,14 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use uuid::Uuid;
 
-use crate::{DEPLOY_CACHE_SUBDIR, DEPLOY_ARTIFACTS_SUBDIR};
+use crate::{DEPLOY_CACHE_SUBDIR, DEPLOY_ARTIFACTS_SUBDIR, DEPLOY_CONF_FILE};
 use crate::actions::{Action, CustomCommand, ProjectCleanAction, BuildAction, PackAction, DeployAction};
 use crate::cmd::{BuildArgs, CleanArgs};
 use crate::configs::DeployerProjectOptions;
 use crate::pipelines::DescribedPipeline;
-use crate::rw::{copy_all, symlink, log};
+use crate::rw::{copy_all, write, symlink, log};
+use crate::utils::get_current_working_dir;
+
 fn enplace_artifacts(
   config: &DeployerProjectOptions,
   build_path: &PathBuf,
@@ -71,6 +73,7 @@ pub(crate) fn build(
   build_path.push(uuid.clone());
   
   copy_all(".", build_path.as_path(), &["Cargo.lock", "target", ".git", "deploy-config.json", DEPLOY_ARTIFACTS_SUBDIR, &uuid])?;
+  write(&get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
   
   if args.with_cache {
     match args.copy_cache {

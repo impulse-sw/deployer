@@ -20,6 +20,7 @@ use crate::cmd::{Cli, DeployerExecType, ListType, NewType, RemoveType, CatType};
 use crate::configs::{DeployerGlobalConfig, DeployerProjectOptions};
 use crate::pipelines::{list_pipelines, new_pipeline, remove_pipeline, cat_pipeline, assign_pipeline_to_project};
 use crate::rw::{read, write, VERBOSE};
+use crate::utils::get_current_working_dir;
 
 #[cfg(feature = "tests")]
 use crate::tests::tests;
@@ -79,7 +80,7 @@ fn main() {
   
   // Чтение конфигов
   let mut globals = read::<DeployerGlobalConfig>(&config_folder, DEPLOY_GLOBAL_CONF_FILE);
-  let mut config = read::<DeployerProjectOptions>(".", DEPLOY_CONF_FILE);
+  let mut config = read::<DeployerProjectOptions>(&get_current_working_dir().unwrap(), DEPLOY_CONF_FILE);
   
   match args.r#type {
     DeployerExecType::Ls(ListType::Actions) => list_actions(&globals),
@@ -105,5 +106,5 @@ fn main() {
   
   // Запись конфигов
   write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
-  write(".", DEPLOY_CONF_FILE, &config);
+  write(&get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
 }
