@@ -56,6 +56,8 @@ pub(crate) fn init(
   if !globals.projects.contains(&curr_dir) { globals.projects.push(curr_dir.to_owned()); }
   
   config.project_name = Text::new("Enter the project's name (or hit `esc`):").prompt_skippable()?;
+  
+  config.cache_files.push(".git".to_string());
   println!("Please, specify the project's programming languages to setup default cache folders.");
   config.langs = select_programming_languages()?;
   for lang in &config.langs {

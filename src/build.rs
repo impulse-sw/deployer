@@ -70,7 +70,10 @@ pub(crate) fn build(
   
   build_path.push(uuid.clone());
   
-  copy_all(".", build_path.as_path(), &["Cargo.lock", "target", ".git", DEPLOY_ARTIFACTS_SUBDIR, &uuid])?;
+  let mut ignore = vec![DEPLOY_ARTIFACTS_SUBDIR, &uuid];
+  ignore.extend_from_slice(&config.cache_files.iter().map(|v| v.as_str()).collect::<Vec<_>>());
+  
+  copy_all(get_current_working_dir().unwrap(), build_path.as_path(), &ignore)?;
   write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
   
   if args.with_cache {
@@ -86,7 +89,7 @@ pub(crate) fn build(
           copy_all(
             curr_dir.join(cache_item.as_str()),
             build_path.join(cache_item.as_str()),
-            &[".git", "deploy-config.json", DEPLOY_ARTIFACTS_SUBDIR, &uuid]
+            &[]
           )?;
           log(format!("-> {}", cache_item.as_str()));
         }
