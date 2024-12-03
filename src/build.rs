@@ -72,7 +72,7 @@ pub(crate) fn build(
   
   build_path.push(uuid.clone());
   
-  copy_all(".", build_path.as_path(), &["Cargo.lock", "target", ".git", "deploy-config.json", DEPLOY_ARTIFACTS_SUBDIR, &uuid])?;
+  copy_all(".", build_path.as_path(), &["Cargo.lock", "target", ".git", DEPLOY_ARTIFACTS_SUBDIR, &uuid])?;
   write(&get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
   
   if args.with_cache {
