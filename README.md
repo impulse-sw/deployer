@@ -36,25 +36,36 @@ deployer new action
 
 For example, let's name it `UPX Compress`. The short name will be `upx-compress`, the version - `0.1.0`.
 
-The full YAML is:
+The full JSON is:
 
-```yaml
-title: UPX Compress
-desc: Compress the binary file with UPX.
-info: upx-compress@0.1.0
-tags: []
-action: !PostBuild
-  supported_langs:
-  - Rust
-  - Go
-  - C
-  - Cpp
-  - !Other any
-  commands:
-  - bash_c: upx %af%
-    ignore_fails: false
-    af_placeholder: '%af%'
-    replace_af_with: []
+```json
+{
+  "title": "UPX Compress",
+  "desc": "Compress the binary file with UPX.",
+  "info": "upx-compress@0.1.0",
+  "tags": [],
+  "action": {
+    "PostBuild": {
+      "supported_langs": [
+        "Rust",
+        "Go",
+        "C",
+        "Cpp",
+        {
+          "Other": "any"
+        }
+      ],
+      "commands": [
+        {
+          "bash_c": "upx %af%",
+          "ignore_fails": false,
+          "af_placeholder": "%af%",
+          "replace_af_with": []
+        }
+      ]
+    }
+  }
+}
 ```
 
 If you're interesting in UPX, consider to visit it [home page](https://upx.github.io/).
@@ -65,44 +76,68 @@ So, let's create a pipeline that will build the binary from the Rust code with p
 deployer new pipeline
 ```
 
-The full YAML is:
+The full JSON is:
 
-```yaml
-title: Rust Enhanced Pipeline
-desc: Build the Rust project with Cargo and compress the resulting binary.
-info: rust-default@0.1.0
-tags: []
-actions:
-- title: Build the project.
-  desc: Got from `Cargo Build (Release)`. Build the Rust project with Cargo default settings in release mode
-  info: cargo-rel@0.1
-  tags:
-  - rust
-  - cargo
-  action: !Build
-    supported_langs:
-    - Rust
-    commands:
-    - bash_c: cargo build --release
-      ignore_fails: false
-      af_placeholder: null
-      replace_af_with: []
-- title: Compress the resulting binary.
-  desc: Got from `UPX Compress`. Compress the binary file with UPX.
-  info: upx-compress@0.1.0
-  tags: []
-  action: !PostBuild
-    supported_langs:
-    - Rust
-    - Go
-    - C
-    - Cpp
-    - !Other any
-    commands:
-    - bash_c: upx %af%
-      ignore_fails: false
-      af_placeholder: '%af%'
-      replace_af_with: []
+```json
+{
+  "title": "Rust Enhanced Pipeline",
+  "desc": "Build the Rust project with Cargo.",
+  "info": "rust-default@0.1.0",
+  "tags": [],
+  "actions": [
+    {
+      "title": "Build the project.",
+      "desc": "Got from `Cargo Build (Release)`. Build the Rust project with Cargo default settings in release mode",
+      "info": "cargo-rel@0.1",
+      "tags": [
+        "rust",
+        "cargo"
+      ],
+      "action": {
+        "Build": {
+          "supported_langs": [
+            "Rust"
+          ],
+          "commands": [
+            {
+              "bash_c": "cargo build --release",
+              "ignore_fails": false,
+              "af_placeholder": null,
+              "replace_af_with": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Compress the resulting binary.",
+      "desc": "Got from `UPX Compress`. Compress the binary file with UPX.",
+      "info": "upx-compress@0.1.0",
+      "tags": [],
+      "action": {
+        "PostBuild": {
+          "supported_langs": [
+            "Rust",
+            "Go",
+            "C",
+            "Cpp",
+            {
+              "Other": "any"
+            }
+          ],
+          "commands": [
+            {
+              "bash_c": "upx %af%",
+              "ignore_fails": false,
+              "af_placeholder": "%af%",
+              "replace_af_with": []
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
 ```
 
 Note that you can change the inner content of Actions inside Pipelines, and also can change the inner content of Pipelines and their Actions if these Pipelines assigned to your project. The changes will not affect Actions and Pipelines from Deployer's Registries.
@@ -117,7 +152,7 @@ deployer cat action upx-compress@0.1.0
 deployer cat pipeline rust-default@0.1.0
 ```
 
-And, of course, load Actions and Pipelines from JSON/YAML files by:
+And, of course, load Actions and Pipelines from JSON files by:
 
 ```bash
 deployer new action -f {your config}
