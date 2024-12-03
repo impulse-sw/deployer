@@ -19,6 +19,9 @@ pub(crate) struct DescribedPipeline {
   /// Список меток для фильтрации действий при выборе из реестра
   pub(crate) tags: Vec<String>,
   pub(crate) actions: Vec<DescribedAction>,
+  /// Информация для проекта: запускать ли по умолчанию
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) default: Option<bool>,
 }
 
 pub(crate) type PipelineInfo = DependencyInfo;
@@ -84,6 +87,7 @@ pub(crate) fn new_pipeline(
     info,
     tags,
     actions: selected_actions_ordered,
+    default: None,
   };
   
   let pipelines = &mut globals.pipelines_registry;
@@ -285,6 +289,18 @@ pub(crate) fn assign_pipeline_to_project(
   pipeline.title = short_name.clone();
   
   if specify_short_name(config, &mut pipeline.title).is_err() { return Ok(()) };
+  
+  if let Some(old_default) = config.pipelines.iter_mut().find(|p| p.default.is_some_and(|v| v)) {
+    if inquire::Confirm::new(&format!(
+      "Pipeline `{}` is already set by default. Set this Pipeline running by default instead?",
+      old_default.title.as_str()
+    )).prompt()? {
+      old_default.default = None;
+      pipeline.default = Some(true);
+    }
+  } else if inquire::Confirm::new("Set this Pipeline running by default?").prompt()? {
+    pipeline.default = Some(true);
+  }
   
   remove_old_pipeline(config, &short_name);
   config.pipelines.push(pipeline);
