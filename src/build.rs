@@ -171,6 +171,37 @@ fn execute_pipeline(
   Ok(())
 }
 
+fn compose_output(
+  bash_c_info: String,
+  stdout: String,
+  stderr: String,
+) -> Vec<String> {
+  let mut output = vec![];
+  
+  if !stdout.trim().is_empty() || !stderr.trim().is_empty() {
+    output.push(format!("Executing `{}`:", bash_c_info));
+  }
+  if !stdout.trim().is_empty() {
+    let total = stdout.chars().filter(|c| *c == '\n').count();
+    
+    for (i, line) in stdout.split('\n').enumerate() {
+      if i == total && line.trim().is_empty() { break }
+      output.push(format!(">>> {}", line));
+    }
+  }
+  if !stderr.trim().is_empty() {
+    let total = stderr.chars().filter(|c| *c == '\n').count();
+    if total != 0 { output.push(format!("{}", "Errors:".red())); }
+    
+    for (i, line) in stderr.split('\n').enumerate() {
+      if i == total && line.trim().is_empty() { break }
+      output.push(format!(">>> {}", line));
+    }
+  }
+  
+  output
+}
+
 trait Execute {
   fn execute(&self, curr_dir: &Path) -> anyhow::Result<(bool, Vec<String>)>;
 }
@@ -189,16 +220,15 @@ impl Execute for CustomCommand {
           .arg("-c")
           .arg(&bash_c)
           .stdout(Stdio::piped())
+          .stderr(Stdio::piped())
           .spawn()
           .map_err(|e| anyhow!("Can't execute `{}` due to: {}", bash_c_info, e))?
           .wait_with_output()
           .map_err(|e| anyhow!("Can't wait for output `{}` due to: {}", bash_c_info, e))?;
         
-        let out_strs = String::from_utf8_lossy_owned(command_output.stdout);
-        if !out_strs.trim().is_empty() {
-          output.push(format!("Executing `{}`:", bash_c_info));
-          output.push(out_strs);
-        }
+        let stdout_strs = String::from_utf8_lossy_owned(command_output.stdout);
+        let stderr_strs = String::from_utf8_lossy_owned(command_output.stderr);
+        output.extend_from_slice(&compose_output(bash_c_info.to_string(), stdout_strs, stderr_strs));
         
         if !self.ignore_fails && !command_output.status.success() {
           return Ok((false, output))
@@ -212,16 +242,15 @@ impl Execute for CustomCommand {
         .arg("-c")
         .arg(self.bash_c.as_str())
         .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| anyhow!("Can't execute `{}` due to: {}", bash_c_info, e))?
         .wait_with_output()
         .map_err(|e| anyhow!("Can't wait for output `{}` due to: {}", bash_c_info, e))?;
       
-      let out_strs = String::from_utf8_lossy_owned(command_output.stdout);
-      if !out_strs.trim().is_empty() {
-        output.push(format!("Executing `{}`:", bash_c_info));
-        output.push(out_strs);
-      }
+      let stdout_strs = String::from_utf8_lossy_owned(command_output.stdout);
+      let stderr_strs = String::from_utf8_lossy_owned(command_output.stderr);
+      output.extend_from_slice(&compose_output(bash_c_info.to_string(), stdout_strs, stderr_strs));
       
       if !self.ignore_fails && !command_output.status.success() {
         return Ok((false, output))
