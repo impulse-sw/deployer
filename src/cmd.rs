@@ -70,10 +70,12 @@ pub(crate) enum RemoveType {
 
 #[derive(Subcommand, Debug)]
 pub(crate) enum CatType {
-  /// Remove an Action
+  /// Prints an Action
   Action(CatActionArgs),
-  /// Remove a Pipeline
+  /// Prints a Pipeline
   Pipeline(CatPipelineArgs),
+  /// Prints all Pipelines used by current Project
+  Project,
 }
 
 #[derive(Args, Debug)]
