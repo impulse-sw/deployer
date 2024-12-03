@@ -1,4 +1,5 @@
 use crate::actions::{ProgrammingLanguage, select_programming_languages, TargetDescription, collect_target};
+use crate::cmd::InitArgs;
 use crate::configs::{DeployerGlobalConfig, DeployerProjectOptions};
 
 fn collect_targets() -> anyhow::Result<Vec<TargetDescription>> {
@@ -47,6 +48,7 @@ fn collect_af_inplacements(artifacts: &[String]) -> anyhow::Result<Vec<(String, 
 pub(crate) fn init(
   globals: &mut DeployerGlobalConfig,
   config: &mut DeployerProjectOptions,
+  _args: &InitArgs,
 ) -> anyhow::Result<()> {
   use inquire::Text;
   

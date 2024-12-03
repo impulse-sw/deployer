@@ -98,7 +98,7 @@ pub(crate) enum NewType {
 
 #[derive(Args, Debug)]
 pub(crate) struct NewActionArgs {
-  /// From description in JSON/YAML
+  /// From description in JSON
   #[arg(short, long)]
   pub(crate) from: Option<String>,
 }
