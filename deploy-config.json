@@ -133,7 +133,8 @@
             }
           }
         }
-      ]
+      ],
+      "default": true
     }
   ],
   "artifacts": [

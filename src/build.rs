@@ -104,8 +104,12 @@ pub(crate) fn build(
       anyhow::bail!("The pipelines' list is empty! Check the config file for errors.")
     }
     
-    for pipeline in &config.pipelines {
+    if let Some(pipeline) = &config.pipelines.iter().find(|p| p.default.is_some_and(|v| v)) {
       execute_pipeline(config, args.silent, pipeline, &build_path, &artifacts_dir)?;
+    } else {
+      for pipeline in &config.pipelines {
+        execute_pipeline(config, args.silent, pipeline, &build_path, &artifacts_dir)?;
+      }
     }
   }
   
