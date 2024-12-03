@@ -17,6 +17,7 @@
   ],
   "last_build": "deploy-build-655e83a5-dd1b-4f71-b507-8cccd0f88333",
   "cache_files": [
+    ".git",
     "Cargo.lock",
     "target"
   ],
