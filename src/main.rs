@@ -84,28 +84,45 @@ fn main() {
   
   match args.r#type {
     DeployerExecType::Ls(ListType::Actions) => list_actions(&globals),
-    DeployerExecType::New(NewType::Action(args)) => { let _ = new_action(&mut globals, &args).unwrap(); },
+    DeployerExecType::New(NewType::Action(args)) => {
+      let _ = new_action(&mut globals, &args).unwrap();
+      write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
+    },
     DeployerExecType::Cat(CatType::Action(args)) => cat_action(&globals, &args).unwrap(),
-    DeployerExecType::Rm(RemoveType::Action) => remove_action(&mut globals).unwrap(),
+    DeployerExecType::Rm(RemoveType::Action) => {
+      remove_action(&mut globals).unwrap();
+      write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
+    },
     
     DeployerExecType::Ls(ListType::Pipelines) => list_pipelines(&globals).unwrap(),
-    DeployerExecType::New(NewType::Pipeline(args)) => new_pipeline(&mut globals, &args).unwrap(),
+    DeployerExecType::New(NewType::Pipeline(args)) => {
+      new_pipeline(&mut globals, &args).unwrap();
+      write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
+    },
     DeployerExecType::Cat(CatType::Pipeline(args)) => cat_pipeline(&globals, &args).unwrap(),
-    DeployerExecType::Rm(RemoveType::Pipeline) => remove_pipeline(&mut globals).unwrap(),
+    DeployerExecType::Rm(RemoveType::Pipeline) => {
+      remove_pipeline(&mut globals).unwrap();
+      write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
+    },
     
-    DeployerExecType::Init(_) => init(&mut globals, &mut config).unwrap(),
-    DeployerExecType::With(args) => assign_pipeline_to_project(&globals, &mut config, &args).unwrap(),
+    DeployerExecType::Init(args) => {
+      init(&mut globals, &mut config, &args).unwrap();
+      write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
+    },
+    DeployerExecType::With(args) => {
+      assign_pipeline_to_project(&globals, &mut config, &args).unwrap();
+      write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
+    },
     DeployerExecType::Cat(CatType::Project) => cat_project_pipelines(&config).unwrap(),
     DeployerExecType::Build(mut args) => build(&mut config, &cache_folder, &mut args).unwrap(),
-    DeployerExecType::Clean(args) => clean_builds(&mut config, &cache_folder, &args).unwrap(),
+    DeployerExecType::Clean(args) => {
+      clean_builds(&mut config, &cache_folder, &args).unwrap();
+      write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
+    },
     
     #[cfg(feature = "tests")]
     DeployerExecType::Tests => tests().unwrap(),
     
     _ => unimplemented!(),
   }
-  
-  // Запись конфигов
-  write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
-  write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
 }
