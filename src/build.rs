@@ -100,6 +100,10 @@ pub(crate) fn build(
   {
     execute_pipeline(config, args.silent, pipeline, &build_path, &artifacts_dir)?;
   } else {
+    if config.pipelines.is_empty() {
+      anyhow::bail!("The pipelines' list is empty! Check the config file for errors.")
+    }
+    
     for pipeline in &config.pipelines {
       execute_pipeline(config, args.silent, pipeline, &build_path, &artifacts_dir)?;
     }
