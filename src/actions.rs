@@ -47,6 +47,9 @@ pub(crate) enum Action {
   /// Действие автопатча зависимости
   PatchDependency(DependencyPatchAction),
   
+  /// Размещает доступные артефакты сейчас
+  ForceArtifactsEnplace,
+  
   /// Действие перед сборкой
   PreBuild(PreBuildAction),
   /// Действие сборки
@@ -542,6 +545,7 @@ pub(crate) fn new_action(
     "Interrupt",
     "Custom",
     "Check",
+    "Force artifacts enplace",
     "Init with template",
     "Register dependency",
     "Delete dependency",
@@ -568,6 +572,7 @@ pub(crate) fn new_action(
   
   let action = match selected_action_type {
     "Interrupt" => Action::Interrupt,
+    "Force artifacts enplace" => Action::ForceArtifactsEnplace,
     "Custom" => {
       let command = new_custom_command(true)?;
       Action::Custom(command)

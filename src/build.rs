@@ -75,26 +75,14 @@ pub(crate) fn build(
     let Some(pipeline_tag) = &args.pipeline_tag &&
     let Some(pipeline) = config.pipelines.iter().find(|p| p.title.as_str() == pipeline_tag)
   {
-    execute_pipeline(args.silent, pipeline, &build_path)?;
+    execute_pipeline(config, args.silent, pipeline, &build_path, &artifacts_dir)?;
   } else {
     for pipeline in &config.pipelines {
-      execute_pipeline(args.silent, pipeline, &build_path)?;
+      execute_pipeline(config, args.silent, pipeline, &build_path, &artifacts_dir)?;
     }
   }
   
-  let mut ignore = vec![DEPLOY_ARTIFACTS_SUBDIR];
-  ignore.extend_from_slice(&(config.cache_files.iter().map(|c| c.as_str()).collect::<Vec<_>>()));
-  
-  for (from, to) in &config.inplace_artifacts_into_project_root {
-    let artifact_path = build_path.join(from);
-    if !std::fs::exists(artifact_path.clone())? {
-      panic!("There is no `{:?}` artifact!", artifact_path);
-    } else if artifact_path.as_path().is_dir() {
-      copy_all(artifact_path.as_path(), artifacts_dir.join(to).join(artifact_path.file_name().unwrap()), &ignore)?;
-    } else if artifact_path.as_path().is_file() {
-      copy_all(artifact_path.as_path(), artifacts_dir.join(to).as_path(), &ignore)?;
-    }
-  }
+  enplace_artifacts(config, &build_path, &artifacts_dir, true)?;
   
   println!("Build path: {}", build_path.to_str().expect("Can't convert `Path` to string!"));
   
@@ -102,9 +90,11 @@ pub(crate) fn build(
 }
 
 fn execute_pipeline(
+  config: &DeployerProjectOptions,
   silent: bool,
   pipeline: &DescribedPipeline,
   build_dir: &Path,
+  artifacts_dir: &PathBuf,
 ) -> anyhow::Result<()> {
   use std::io::{stdout, Write};
   use std::time::Instant;
@@ -123,6 +113,11 @@ fn execute_pipeline(
       Action::ProjectClean(pc_action) => pc_action.execute(build_dir)?,
       Action::Pack(a) | Action::Deliver(a) | Action::Install(a) => a.execute(build_dir)?,
       Action::ConfigureDeploy(a) | Action::Deploy(a) | Action::PostDeploy(a) => a.execute(build_dir)?,
+      Action::ForceArtifactsEnplace => {
+        enplace_artifacts(config, &build_dir.to_path_buf(), &artifacts_dir, false)?;
+        enplace_artifacts(config, &build_dir.to_path_buf(), &build_dir.to_path_buf().join(DEPLOY_ARTIFACTS_SUBDIR), false)?;
+        (true, vec!["Artifacts are enplaced successfully.".into()])
+      },
       _ => {
         print!("{}", "not implemented! skip...".red());
         stdout().flush()?;
