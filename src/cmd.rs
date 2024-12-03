@@ -74,6 +74,8 @@ pub(crate) enum CatType {
   Action(CatActionArgs),
   /// Prints a Pipeline
   Pipeline(CatPipelineArgs),
+  /// Prints all Pipelines used by current Project
+  Project,
 }
 
 #[derive(Args, Debug)]

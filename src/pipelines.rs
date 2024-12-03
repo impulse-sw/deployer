@@ -224,6 +224,17 @@ pub(crate) fn cat_pipeline(
   Ok(())
 }
 
+pub(crate) fn cat_project_pipelines(
+  config: &DeployerProjectOptions,
+) -> anyhow::Result<()> {
+  for pipeline in &config.pipelines {
+    let pipeline_yaml = serde_yaml::to_string(&pipeline).unwrap();
+    println!("{}", pipeline_yaml);
+  }
+  
+  Ok(())
+}
+
 fn reorder_pipelines_in_project(
   pipelines_unordered: Vec<DescribedPipeline>,
 ) -> anyhow::Result<Vec<DescribedPipeline>> {

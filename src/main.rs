@@ -18,7 +18,7 @@ mod pipelines;
 use crate::actions::{list_actions, new_action, remove_action, cat_action};
 use crate::cmd::{Cli, DeployerExecType, ListType, NewType, RemoveType, CatType};
 use crate::configs::{DeployerGlobalConfig, DeployerProjectOptions};
-use crate::pipelines::{list_pipelines, new_pipeline, remove_pipeline, cat_pipeline, assign_pipeline_to_project};
+use crate::pipelines::{list_pipelines, new_pipeline, remove_pipeline, cat_pipeline, cat_project_pipelines, assign_pipeline_to_project};
 use crate::rw::{read, write, VERBOSE};
 use crate::utils::get_current_working_dir;
 
@@ -95,6 +95,7 @@ fn main() {
     
     DeployerExecType::Init(_) => init(&mut globals, &mut config).unwrap(),
     DeployerExecType::With(args) => assign_pipeline_to_project(&globals, &mut config, &args).unwrap(),
+    DeployerExecType::Cat(CatType::Project) => cat_project_pipelines(&config).unwrap(),
     DeployerExecType::Build(mut args) => build(&mut config, &cache_folder, &mut args).unwrap(),
     DeployerExecType::Clean(args) => clean_builds(&mut config, &cache_folder, &args).unwrap(),
     
