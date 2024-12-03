@@ -41,7 +41,7 @@ pub(crate) static DEPLOY_CACHE_SUBDIR: &str = "deploy-cache";
 pub(crate) static DEPLOY_ARTIFACTS_SUBDIR: &str = "artifacts";
 
 #[cfg(not(unix))]
-compile_error!("`cc-deploy` can't work with non-Unix systems.");
+compile_error!("`deployer` can't work with non-Unix systems.");
 
 fn main() {
   std::panic::set_hook(Box::new(|e| {
