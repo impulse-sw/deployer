@@ -999,7 +999,7 @@ pub(crate) fn cat_action(
     Some(action) => action,
   };
   
-  let action_yaml = serde_yaml::to_string(&action).unwrap();
+  let action_yaml = serde_json::to_string_pretty(&action).unwrap();
   println!("{}", action_yaml);
   
   Ok(())

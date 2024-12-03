@@ -218,7 +218,7 @@ pub(crate) fn cat_pipeline(
     Some(pipeline) => pipeline,
   };
   
-  let pipeline_yaml = serde_yaml::to_string(&pipeline).unwrap();
+  let pipeline_yaml = serde_json::to_string_pretty(&pipeline).unwrap();
   println!("{}", pipeline_yaml);
   
   Ok(())
@@ -228,7 +228,7 @@ pub(crate) fn cat_project_pipelines(
   config: &DeployerProjectOptions,
 ) -> anyhow::Result<()> {
   for pipeline in &config.pipelines {
-    let pipeline_yaml = serde_yaml::to_string(&pipeline).unwrap();
+    let pipeline_yaml = serde_json::to_string_pretty(&pipeline).unwrap();
     println!("{}", pipeline_yaml);
   }
   

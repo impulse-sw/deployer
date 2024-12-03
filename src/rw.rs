@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::sync::OnceLock;
 use std::path::{Path, PathBuf};
+use crate::DEPLOY_CONF_FILE;
 
 pub(crate) static VERBOSE: OnceLock<bool> = OnceLock::new();
 
@@ -20,7 +21,6 @@ pub(crate) fn read_checked<T: DeserializeOwned>(filepath: impl AsRef<Path>) -> a
   
   match filepath.as_ref().extension().unwrap().to_str().unwrap().to_lowercase().as_str() {
     "json" => Ok(serde_json::from_reader(reader)?),
-    "yaml" | "yml" => Ok(serde_yaml::from_reader(reader)?),
     _ => Err(anyhow::anyhow!("Unsupported file extension!"))
   }
 }
@@ -71,9 +71,9 @@ pub(crate) fn copy_all(src: impl AsRef<Path>, dst: impl AsRef<Path>, ignore: &[&
     let d = dst.as_ref().join(entry.file_name());
     if ty.is_dir() {
       copy_all(entry.path(), d, ignore)?;
-    } else if name == "deploy-config.json" {
+    } else if name == DEPLOY_CONF_FILE {
       
-      log(format!("Symlinking `deploy-config.json` from {:?} to {:?}", entry.path(), d));
+      log(format!("Symlinking `{}` from {:?} to {:?}", name, entry.path(), d));
       
       symlink(std::fs::canonicalize(entry.path())?, d);
     } else if ty.is_file() {
