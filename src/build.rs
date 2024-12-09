@@ -152,6 +152,11 @@ fn execute_pipeline(
         enplace_artifacts(config, build_dir, &build_dir.to_path_buf().join(DEPLOY_ARTIFACTS_SUBDIR), false)?;
         (true, vec!["Artifacts are enplaced successfully.".into()])
       },
+      Action::Interrupt => {
+        println!();
+        inquire::Confirm::new("The Pipeline is interrupted. Click `Enter` to continue").with_default(true).prompt()?;
+        (true, vec![])
+      },
       _ => {
         print!("{}", "not implemented! skip...".red());
         stdout().flush()?;
