@@ -74,7 +74,8 @@
                   "bash_c": "cargo build --release",
                   "ignore_fails": false,
                   "af_placeholder": null,
-                  "replace_af_with": []
+                  "replace_af_with": [],
+                  "show_success_output": false
                 }
               ]
             }
@@ -103,7 +104,8 @@
                   "af_placeholder": "%af%",
                   "replace_af_with": [
                     "target/release/deployer"
-                  ]
+                  ],
+                  "show_success_output": false
                 }
               ]
             }

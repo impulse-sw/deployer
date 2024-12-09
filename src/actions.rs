@@ -218,6 +218,19 @@ pub(crate) struct CustomCommand {
   pub(crate) af_placeholder: Option<String>,
   /// Список файлов, которые нужно подставлять вместо плейсхолдера. Команда будет выполнена столько раз, сколько указано артефактов.
   pub(crate) replace_af_with: Vec<String>,
+  /// Отображать ли вывод команды, если не возникла ошибка.
+  /// 
+  /// По умолчанию считается как `true`.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) show_success_output: Option<bool>,
+  /// Отображать ли команду.
+  /// 
+  /// Потенциально команда может содержать уязвимые переменные, такие как: ключи, пароли, пути к чувствительным файлам и т.д.
+  /// Их можно скрыть при сборке, если указать `false`.
+  /// 
+  /// По умолчанию считается как `true`.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) show_bash_c: Option<bool>,
 }
 
 impl CustomCommand {

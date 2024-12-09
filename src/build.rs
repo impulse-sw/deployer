@@ -190,11 +190,19 @@ fn compose_output(
   stdout: String,
   stderr: String,
   success: bool,
+  show_success_output: bool,
+  show_bash_c: bool,
 ) -> Vec<String> {
   let mut output = vec![];
   
+  if success && !show_success_output { return output }
+  
   if !stdout.trim().is_empty() || !stderr.trim().is_empty() {
-    output.push(format!("Executing `{}`:", bash_c_info));
+    if show_bash_c {
+      output.push(format!("Executing `{}`:", bash_c_info));
+    } else {
+      output.push("Executing the command:".to_string());
+    }
   }
   if !stdout.trim().is_empty() {
     let total = stdout.chars().filter(|c| *c == '\n').count();
@@ -243,7 +251,14 @@ impl Execute for CustomCommand {
         
         let stdout_strs = String::from_utf8_lossy_owned(command_output.stdout);
         let stderr_strs = String::from_utf8_lossy_owned(command_output.stderr);
-        output.extend_from_slice(&compose_output(bash_c_info.to_string(), stdout_strs, stderr_strs, command_output.status.success()));
+        output.extend_from_slice(&compose_output(
+          bash_c_info.to_string(),
+          stdout_strs,
+          stderr_strs,
+          command_output.status.success(),
+          self.show_success_output.unwrap_or(true),
+          self.show_bash_c.unwrap_or(true),
+        ));
         
         if !self.ignore_fails && !command_output.status.success() {
           return Ok((false, output))
@@ -265,7 +280,14 @@ impl Execute for CustomCommand {
       
       let stdout_strs = String::from_utf8_lossy_owned(command_output.stdout);
       let stderr_strs = String::from_utf8_lossy_owned(command_output.stderr);
-      output.extend_from_slice(&compose_output(bash_c_info.to_string(), stdout_strs, stderr_strs, command_output.status.success()));
+      output.extend_from_slice(&compose_output(
+        bash_c_info.to_string(),
+        stdout_strs,
+        stderr_strs,
+        command_output.status.success(),
+        self.show_success_output.unwrap_or(true),
+        self.show_bash_c.unwrap_or(true),
+      ));
       
       if !self.ignore_fails && !command_output.status.success() {
         return Ok((false, output))
