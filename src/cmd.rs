@@ -32,12 +32,12 @@ pub(crate) enum DeployerExecType {
   /// Print info about inner Deployer's object
   #[command(subcommand)]
   Cat(CatType),
+  /// Edit inner Deployer's object
+  #[command(subcommand)]
+  Edit(EditType),
   /// Remove the inner Deployer's object
   #[command(subcommand)]
   Rm(RemoveType),
-  
-  /// Export action, pipeline or artifact
-  Export(ExportArgs),
   
   /// Init the deployable project
   Init(InitArgs),
@@ -78,6 +78,16 @@ pub(crate) enum CatType {
   Project,
 }
 
+#[derive(Subcommand, Debug)]
+pub(crate) enum EditType {
+  /// Edits an Action
+  Action(CatActionArgs),
+  /// Edits a Pipeline
+  Pipeline(CatPipelineArgs),
+  /// Edits Project settings
+  Project,
+}
+
 #[derive(Args, Debug)]
 pub(crate) struct CatActionArgs {
   pub(crate) action_short_info_and_version: String,
@@ -106,21 +116,6 @@ pub(crate) struct NewActionArgs {
 pub(crate) type NewPipelineArgs = NewActionArgs;
 
 #[derive(Args, Debug)]
-pub(crate) struct ExportArgs {
-  #[command(subcommand)]
-  pub(crate) export_type: ExportType,
-  /// {short-name}@{version}
-  pub(crate) tag: String,
-}
-
-#[derive(Subcommand, Debug)]
-pub(crate) enum ExportType {
-  Action,
-  Pipeline,
-  Artifact,
-}
-
-#[derive(Args, Debug)]
 pub(crate) struct InitArgs {
   
 }
@@ -128,7 +123,7 @@ pub(crate) struct InitArgs {
 #[derive(Args, Debug)]
 pub(crate) struct WithPipelineArgs {
   /// {short-name}@{version}
-  pub(crate) tag: String,
+  pub(crate) tag: Option<String>,
   /// {short-name}
   #[arg(short, long)]
   pub(crate) r#as: Option<String>,

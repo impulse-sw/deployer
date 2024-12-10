@@ -1,4 +1,5 @@
-#![feature(let_chains, once_wait, string_from_utf8_lossy_owned)]
+#![feature(let_chains, if_let_guard, once_wait, string_from_utf8_lossy_owned)]
+#![warn(clippy::todo, clippy::unimplemented)]
 #![deny(warnings)]
 
 #[cfg(feature = "tests")]
@@ -14,11 +15,14 @@ mod build;
 
 mod actions;
 mod pipelines;
+mod project;
+mod variables;
 
-use crate::actions::{list_actions, new_action, remove_action, cat_action};
-use crate::cmd::{Cli, DeployerExecType, ListType, NewType, RemoveType, CatType};
+use crate::actions::{list_actions, new_action, remove_action, cat_action, edit_action};
+use crate::cmd::{Cli, DeployerExecType, ListType, NewType, RemoveType, CatType, EditType};
 use crate::configs::{DeployerGlobalConfig, DeployerProjectOptions};
-use crate::pipelines::{list_pipelines, new_pipeline, remove_pipeline, cat_pipeline, cat_project_pipelines, assign_pipeline_to_project};
+use crate::pipelines::{list_pipelines, new_pipeline, remove_pipeline, cat_pipeline, cat_project_pipelines, assign_pipeline_to_project, edit_pipeline};
+use crate::project::edit_project;
 use crate::rw::{read, write, VERBOSE};
 use crate::utils::get_current_working_dir;
 
@@ -89,6 +93,10 @@ fn main() {
       write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
     },
     DeployerExecType::Cat(CatType::Action(args)) => cat_action(&globals, &args).unwrap(),
+    DeployerExecType::Edit(EditType::Action(args)) => {
+      edit_action(&mut globals, &args).unwrap();
+      write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
+    },
     DeployerExecType::Rm(RemoveType::Action) => {
       remove_action(&mut globals).unwrap();
       write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
@@ -100,6 +108,10 @@ fn main() {
       write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
     },
     DeployerExecType::Cat(CatType::Pipeline(args)) => cat_pipeline(&globals, &args).unwrap(),
+    DeployerExecType::Edit(EditType::Pipeline(args)) => {
+      edit_pipeline(&mut globals, &args).unwrap();
+      write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
+    },
     DeployerExecType::Rm(RemoveType::Pipeline) => {
       remove_pipeline(&mut globals).unwrap();
       write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
@@ -110,10 +122,16 @@ fn main() {
       write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
     },
     DeployerExecType::With(args) => {
-      assign_pipeline_to_project(&globals, &mut config, &args).unwrap();
+      assign_pipeline_to_project(&mut globals, &mut config, &args).unwrap();
+      write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
       write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
     },
     DeployerExecType::Cat(CatType::Project) => cat_project_pipelines(&config).unwrap(),
+    DeployerExecType::Edit(EditType::Project) => {
+      edit_project(&mut globals, &mut config).unwrap();
+      write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
+      write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
+    },
     DeployerExecType::Build(mut args) => build(&mut config, &cache_folder, &mut args).unwrap(),
     DeployerExecType::Clean(args) => {
       clean_builds(&mut config, &cache_folder, &args).unwrap();
@@ -122,7 +140,5 @@ fn main() {
     
     #[cfg(feature = "tests")]
     DeployerExecType::Tests => tests().unwrap(),
-    
-    _ => unimplemented!(),
   }
 }

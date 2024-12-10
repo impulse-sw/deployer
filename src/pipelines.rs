@@ -2,7 +2,7 @@ use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::process::exit;
 
-use crate::actions::{DescribedAction, DependencyInfo, new_action};
+use crate::actions::{DescribedAction, ActionInfo, new_action, Edit, EditExtended};
 use crate::cmd::{NewActionArgs, NewPipelineArgs, CatPipelineArgs, WithPipelineArgs};
 use crate::configs::{DeployerGlobalConfig, DeployerProjectOptions};
 use crate::hmap;
@@ -11,20 +11,78 @@ use crate::utils::{info2str_simple, info2str, str2info, tags_custom_type};
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub(crate) struct DescribedPipeline {
+  /// Заголовок Пайплайна.
   pub(crate) title: String,
+  /// Описание Пайплайна.
   pub(crate) desc: String,
-  /// Короткое имя и версия
+  /// Короткое имя и версия.
   #[serde(serialize_with = "info2str", deserialize_with = "str2info")]
   pub(crate) info: PipelineInfo,
-  /// Список меток для фильтрации действий при выборе из реестра
+  /// Список меток для фильтрации Действий при выборе из Реестра.
   pub(crate) tags: Vec<String>,
   pub(crate) actions: Vec<DescribedAction>,
-  /// Информация для проекта: запускать ли по умолчанию
+  /// Информация для проекта: запускать ли Пайплайн по умолчанию.
+  /// 
+  /// Если не установлен, считается как `false`.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub(crate) default: Option<bool>,
 }
 
-pub(crate) type PipelineInfo = DependencyInfo;
+impl DescribedPipeline {
+  pub(crate) fn new_from_prompt(globals: &mut DeployerGlobalConfig) -> anyhow::Result<Self> {
+    use inquire::Text;
+    
+    let short_name = Text::new("Write the Pipeline's short name:").prompt()?;
+    let version = Text::new("Specify the Pipeline's version:").prompt()?;
+    
+    let info = PipelineInfo { short_name, version };
+    
+    let name = Text::new("Write the Pipeline's full name:").prompt()?;
+    let desc = Text::new("Write the Pipeline's description:").prompt()?;
+    
+    let tags: Vec<String> = tags_custom_type("Write Pipeline's tags, if any:").prompt()?;
+    
+    let selected_actions_unordered = collect_multiple_actions(globals)?;
+    let selected_actions_ordered = reorder_actions(selected_actions_unordered)?;
+    
+    let described_pipeline = DescribedPipeline {
+      title: name,
+      desc,
+      info,
+      tags,
+      actions: selected_actions_ordered,
+      default: None,
+    };
+    
+    Ok(described_pipeline)
+  }
+  
+  pub(crate) fn edit_pipeline_from_prompt(&mut self) -> anyhow::Result<()> {
+    let actions = vec![
+      "Edit title",
+      "Edit description",
+      "Edit tags",
+      "Edit Pipeline's Actions",
+    ];
+    
+    while let Some(action) = inquire::Select::new(
+      "Select an edit action (hit `esc` when done):",
+      actions.clone(),
+    ).prompt_skippable()? {
+      match action {
+        "Edit title" => self.title = inquire::Text::new("Write the Action's full name:").prompt()?,
+        "Edit description" => self.desc = inquire::Text::new("Write the Action's description:").prompt()?,
+        "Edit tags" => self.tags = tags_custom_type("Write Action's tags, if any:").prompt()?,
+        "Edit Pipeline's Actions" => self.actions.edit_from_prompt()?,
+        _ => {},
+      }
+    }
+    
+    Ok(())
+  }
+}
+
+pub(crate) type PipelineInfo = ActionInfo;
 
 /// Перечисляет все доступные пайплайны.
 pub(crate) fn list_pipelines(
@@ -38,60 +96,39 @@ pub(crate) fn list_pipelines(
   for pipeline in pipelines {
     let pipeline_info = format!("{}@{}", pipeline.info.short_name, pipeline.info.version);
     let pipeline_title = format!("[{}]", pipeline.title);
-    println!("• {} {} (tags: {})", pipeline_info.blue().bold(), pipeline_title.green().bold(), pipeline.tags.join(", ").as_str().blue().italic());
+    let tags = if pipeline.tags.is_empty() { String::new() } else { format!(" (tags: {})", pipeline.tags.join(", ").as_str().blue().italic()) };
+    println!("• {} {}{}", pipeline_info.blue().bold(), pipeline_title.green().bold(), tags);
     println!("\t> {}", pipeline.desc.green().italic());
   }
   
   Ok(())
 }
 
+/// Создаёт новый пайплайн.
 pub(crate) fn new_pipeline(
   globals: &mut DeployerGlobalConfig,
   args: &NewPipelineArgs,
 ) -> anyhow::Result<()> {
-  use inquire::{Text, Confirm};
-  
-  let pipelines = &mut globals.pipelines_registry;
-  
   if let Some(from_file) = &args.from {
     let pipeline = read_checked::<DescribedPipeline>(from_file).map_err(|e| {
       panic!("Can't read provided Pipeline file due to: {}", e);
     }).unwrap();
-    pipelines.insert(info2str_simple(&pipeline.info), pipeline);
+    globals.pipelines_registry.insert(info2str_simple(&pipeline.info), pipeline);
     return Ok(())
   }
   
-  let short_name = Text::new("Write the Pipeline's short name:").prompt()?;
-  let version = Text::new("Specify the Pipeline's version:").prompt()?;
-  
-  let info = PipelineInfo { short_name, version };
+  let described_pipeline = DescribedPipeline::new_from_prompt(globals)?;
   
   if
-    pipelines.contains_key(&info2str_simple(&info)) &&
-    !Confirm::new(&format!("Pipelines Registry already have `{}` Pipeline. Do you want to override it? (y/n)", info2str_simple(&info))).prompt()?
+    globals.pipelines_registry.contains_key(&info2str_simple(&described_pipeline.info)) &&
+    !inquire::Confirm::new(&format!(
+      "Pipelines Registry already have `{}` Pipeline. Do you want to override it? (y/n)", info2str_simple(&described_pipeline.info))
+    ).prompt()?
   {
     return Ok(())
   }
   
-  let name = Text::new("Write the Pipeline's full name:").prompt()?;
-  let desc = Text::new("Write the Pipeline's description:").prompt()?;
-  
-  let tags: Vec<String> = tags_custom_type("Write Pipeline's tags, if any:").prompt()?;
-  
-  let selected_actions_unordered = collect_multiple_actions(globals)?;
-  let selected_actions_ordered = reorder_actions(selected_actions_unordered)?;
-  
-  let described_pipeline = DescribedPipeline {
-    title: name,
-    desc,
-    info,
-    tags,
-    actions: selected_actions_ordered,
-    default: None,
-  };
-  
-  let pipelines = &mut globals.pipelines_registry;
-  pipelines.insert(info2str_simple(&described_pipeline.info), described_pipeline);
+  globals.pipelines_registry.insert(info2str_simple(&described_pipeline.info), described_pipeline);
   
   Ok(())
 }
@@ -265,18 +302,38 @@ fn reorder_pipelines_in_project(
 }
 
 pub(crate) fn assign_pipeline_to_project(
-  globals: &DeployerGlobalConfig,
+  globals: &mut DeployerGlobalConfig,
   config: &mut DeployerProjectOptions,
   args: &WithPipelineArgs,
 ) -> anyhow::Result<()> {
-  let mut pipeline = globals
-    .pipelines_registry
-    .get(&args.tag)
-    .ok_or_else(|| anyhow::anyhow!("There is no such Pipeline in Registry. See available Pipelines with `deployer ls pipelines`."))?
-    .clone();
+  let mut pipeline = if let Some(tag) = &args.tag {
+    globals
+      .pipelines_registry
+      .get(tag)
+      .ok_or_else(|| anyhow::anyhow!("There is no such Pipeline in Registry. See available Pipelines with `deployer ls pipelines`."))?
+      .clone()
+  } else if !globals.pipelines_registry.is_empty() {
+    let mut ptags = hmap!();
+    let mut tags = vec![];
+    
+    globals
+      .pipelines_registry
+      .iter()
+      .map(|(k, v)| (format!("`{}` - {}", k.blue().bold(), v.title.green().bold()), v))
+      .for_each(|(t, p)| { tags.push(t.clone()); ptags.insert(t, p); });
+    
+    let selected = inquire::Select::new("Select the Pipeline for this project:", tags).prompt()?;
+    let pipeline = ptags
+      .get(&selected)
+      .ok_or(anyhow::anyhow!("There is no such Pipeline in Registry. See available Pipelines with `deployer ls pipelines`."))?;
+    
+    (*pipeline).clone()
+  } else {
+    DescribedPipeline::new_from_prompt(globals)?
+  };
   
   for action in &mut pipeline.actions {
-    *action = action.prompt_setup_for_project(&config.langs, &config.deploy_toolkit, &config.targets, &config.artifacts)?;
+    *action = action.prompt_setup_for_project(&config.langs, &config.deploy_toolkit, &config.targets, &config.variables, &config.artifacts)?;
   }
   
   let short_name = if let Some(short_name) = args.r#as.as_ref() {
@@ -298,7 +355,7 @@ pub(crate) fn assign_pipeline_to_project(
       old_default.default = None;
       pipeline.default = Some(true);
     }
-  } else if inquire::Confirm::new("Set this Pipeline running by default?").prompt()? {
+  } else if inquire::Confirm::new("Set this Pipeline running by default? (y/n)").prompt()? {
     pipeline.default = Some(true);
   }
   
@@ -336,5 +393,102 @@ fn remove_old_pipeline(
 ) {
   if let Some(i) = config.pipelines.iter().position(|p| p.title.as_str() == short_name) {
     config.pipelines.remove(i);
+  }
+}
+
+pub(crate) fn edit_pipeline(
+  globals: &mut DeployerGlobalConfig,
+  args: &CatPipelineArgs,
+) -> anyhow::Result<()> {
+  let pipeline = match globals.pipelines_registry.get_mut(&args.pipeline_short_info_and_version) {
+    None => exit(1),
+    Some(pipeline) => pipeline,
+  };
+  
+  pipeline.edit_pipeline_from_prompt()?;
+  
+  Ok(())
+}
+
+impl EditExtended<DeployerGlobalConfig> for Vec<DescribedPipeline> {
+  fn edit_from_prompt(&mut self, opts: &mut DeployerGlobalConfig) -> anyhow::Result<()> {
+    loop {
+      let mut cmap = hmap!();
+      let mut cs = vec![];
+      
+      self.iter_mut().for_each(|c| {
+        let s = format!("Edit Pipeline `{}` - `{}`", c.title, info2str_simple(&c.info));
+        
+        cmap.insert(s.clone(), c);
+        cs.push(s);
+      });
+      
+      cs.extend_from_slice(&["Reorder Pipelines".to_string(), "Add Pipeline".to_string(), "Remove Pipeline".to_string()]);
+      
+      if let Some(action) = inquire::Select::new("Select a concrete Pipeline to change (hit `esc` when done):", cs).prompt_skippable()? {
+        match action.as_str() {
+          "Reorder Pipelines" => self.reorder(opts)?,
+          "Add Pipeline" => self.add_item(opts)?,
+          "Remove Pipeline" => self.remove_item(opts)?,
+          s if cmap.contains_key(s) => cmap.get_mut(s).unwrap().edit_pipeline_from_prompt()?,
+          _ => {},
+        }
+      } else { break }
+    }
+    
+    Ok(())
+  }
+  
+  fn reorder(&mut self, _opts: &mut DeployerGlobalConfig) -> anyhow::Result<()> {
+    use inquire::ReorderableList;
+    
+    let mut h = hmap!();
+    let mut k = vec![];
+    
+    for selected in self.iter() {
+      let key = format!("Pipeline `{}` - `{}`", selected.title, info2str_simple(&selected.info));
+      k.push(key.clone());
+      h.insert(key, selected);
+    }
+    
+    let reordered = ReorderableList::new("Reorder Pipeline's Actions:", k).prompt()?;
+    
+    let mut selected_commands_ordered = vec![];
+    for key in reordered {
+      selected_commands_ordered.push((*h.get(&key).unwrap()).clone());
+    }
+    
+    *self = selected_commands_ordered;
+    
+    Ok(())
+  }
+  
+  fn add_item(&mut self, opts: &mut DeployerGlobalConfig) -> anyhow::Result<()> {
+    self.push(DescribedPipeline::new_from_prompt(opts)?);
+    Ok(())
+  }
+  
+  fn remove_item(&mut self, _opts: &mut DeployerGlobalConfig) -> anyhow::Result<()> {
+    let mut cmap = hmap!();
+    let mut cs = vec![];
+    
+    self.iter().for_each(|c| {
+      let s = format!("Remove Pipeline `{}` - `{}`", c.title, info2str_simple(&c.info));
+      
+      cmap.insert(s.clone(), c);
+      cs.push(s);
+    });
+    
+    let selected = inquire::Select::new("Select an Pipeline to remove:", cs.clone()).prompt()?;
+    
+    let mut commands = vec![];
+    for key in cs {
+      if key.as_str().eq(selected.as_str()) { continue }
+      commands.push((*cmap.get(&key).unwrap()).clone());
+    }
+    
+    *self = commands;
+    
+    Ok(())
   }
 }
