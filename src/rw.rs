@@ -86,6 +86,16 @@ pub(crate) fn copy_all(src: impl AsRef<Path>, dst: impl AsRef<Path>, ignore: &[&
   Ok(())
 }
 
+pub(crate) fn remove_all(path: impl AsRef<Path>) -> anyhow::Result<()> {
+  if path.as_ref().is_file() {
+    std::fs::remove_file(path)?;
+  } else if path.as_ref().is_dir() {
+    std::fs::remove_dir_all(path)?
+  }
+  
+  Ok(())
+}
+
 pub(crate) fn symlink(src: impl AsRef<Path>, dst: impl AsRef<Path>) {
   use std::os::unix::fs::symlink as os_symlink;
   

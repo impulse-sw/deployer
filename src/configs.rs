@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use crate::actions::{
   TargetDescription,
   DescribedAction,
-  DescribedDependency,
+  // DescribedDependency,
   Action,
   ActionInfo,
   BuildAction,
@@ -14,6 +14,7 @@ use crate::actions::{
 use crate::pipelines::DescribedPipeline;
 use crate::hmap;
 use crate::utils::{info2str_simple, ordered_map};
+use crate::variables::Variable;
 
 /// Конфигурация проекта.
 #[derive(Deserialize, Serialize, Default, Debug)]
@@ -42,6 +43,8 @@ pub(crate) struct DeployerProjectOptions {
   
   /// Артефакты
   pub(crate) artifacts: Vec<String>,
+  /// Переменные
+  pub(crate) variables: Vec<Variable>,
   /// Правила размещения артефактов
   pub(crate) inplace_artifacts_into_project_root: Vec<(String, String)>,
 }
@@ -51,15 +54,17 @@ pub(crate) struct DeployerProjectOptions {
 pub(crate) struct DeployerGlobalConfig {
   /// Список ведомых проектов.
   pub(crate) projects: Vec<String>,
+  /// Список доступных шаблонов проектов.
+  pub(crate) templates: Vec<String>,
   /// Реестр доступных действий.
   #[serde(serialize_with = "ordered_map")]
   pub(crate) actions_registry: HashMap<String, DescribedAction>,
   /// Реестр доступных пайплайнов.
   #[serde(serialize_with = "ordered_map")]
   pub(crate) pipelines_registry: HashMap<String, DescribedPipeline>,
-  /// Реестр доступных зависимостей.
-  #[serde(serialize_with = "ordered_map")]
-  pub(crate) dependencies_registry: HashMap<String, DescribedDependency>,
+  // /// Реестр доступных зависимостей.
+  // #[serde(serialize_with = "ordered_map")]
+  // pub(crate) dependencies_registry: HashMap<String, DescribedDependency>,
 }
 
 impl Default for DeployerGlobalConfig {
@@ -76,8 +81,11 @@ impl Default for DeployerGlobalConfig {
         supported_langs: vec![ProgrammingLanguage::Rust],
         commands: vec![CustomCommand {
           bash_c: "cargo build --release".into(),
+          placeholders: None,
+          replacements: None,
           ignore_fails: false,
-          ..Default::default()
+          show_success_output: false,
+          show_bash_c: true,
         }],
       })
     });
@@ -85,8 +93,9 @@ impl Default for DeployerGlobalConfig {
     let pipelines_registry = hmap!();
     
     Self {
-      dependencies_registry: hmap!(),
+      // dependencies_registry: hmap!(),
       projects: vec![],
+      templates: vec![],
       actions_registry,
       pipelines_registry,
     }

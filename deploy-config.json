@@ -13,9 +13,9 @@
   ],
   "deploy_toolkit": null,
   "builds": [
-    "deploy-build-655e83a5-dd1b-4f71-b507-8cccd0f88333"
+    "deploy-build-044726b7-eedf-475f-b37b-056b2f6c2e44"
   ],
-  "last_build": "deploy-build-655e83a5-dd1b-4f71-b507-8cccd0f88333",
+  "last_build": "deploy-build-044726b7-eedf-475f-b37b-056b2f6c2e44",
   "cache_files": [
     ".git",
     "Cargo.lock",
@@ -24,24 +24,25 @@
   "pipelines": [
     {
       "title": "build",
-      "desc": "Got from `Rust - Build, compress, install`. Build, compress and install the binary for Rust project",
-      "info": "rust-install@0.1.0",
+      "desc": "Got from `Deployer Pipeline`.",
+      "info": "deployer-default@0.1.0",
       "tags": [
-        "rust",
         "cargo",
+        "clippy",
+        "build",
         "upx"
       ],
       "actions": [
         {
-          "title": "Lint the project",
-          "desc": "Got from `Clippy Lint`. Lint your project",
-          "info": "cargo-clippy@0.1",
+          "title": "Lint",
+          "desc": "Got from `Cargo Clippy`.",
+          "info": "cargo-clippy@0.1.0",
           "tags": [
-            "rust",
-            "cargo"
+            "cargo",
+            "clippy"
           ],
           "action": {
-            "Build": {
+            "PreBuild": {
               "supported_langs": [
                 "Rust"
               ],
@@ -49,15 +50,15 @@
                 {
                   "bash_c": "cargo clippy",
                   "ignore_fails": false,
-                  "af_placeholder": null,
-                  "replace_af_with": []
+                  "show_success_output": true,
+                  "show_bash_c": true
                 }
               ]
             }
           }
         },
         {
-          "title": "Build the binary",
+          "title": "Build",
           "desc": "Got from `Cargo Build (Release)`. Build the Rust project with Cargo default settings in release mode",
           "info": "cargo-rel@0.1",
           "tags": [
@@ -73,18 +74,20 @@
                 {
                   "bash_c": "cargo build --release",
                   "ignore_fails": false,
-                  "af_placeholder": null,
-                  "replace_af_with": []
+                  "show_success_output": false,
+                  "show_bash_c": true
                 }
               ]
             }
           }
         },
         {
-          "title": "Compress the binary",
-          "desc": "Got from `UPX Compress`. Compress the binary file with UPX.",
-          "info": "upx-compress@0.1.0",
-          "tags": [],
+          "title": "Compress",
+          "desc": "Got from `UPX Compress`.",
+          "info": "upx@0.1.0",
+          "tags": [
+            "upx"
+          ],
           "action": {
             "PostBuild": {
               "supported_langs": [
@@ -92,43 +95,77 @@
                 "Go",
                 "C",
                 "Cpp",
+                "Python",
                 {
                   "Other": "any"
                 }
               ],
               "commands": [
                 {
-                  "bash_c": "upx %af%",
+                  "bash_c": "upx <artifact>",
+                  "placeholders": [
+                    "<artifact>"
+                  ],
+                  "replacements": [
+                    [
+                      [
+                        "<artifact>",
+                        {
+                          "title": "target/release/deployer",
+                          "is_secret": false,
+                          "value": {
+                            "Plain": "target/release/deployer"
+                          }
+                        }
+                      ]
+                    ]
+                  ],
                   "ignore_fails": false,
-                  "af_placeholder": "%af%",
-                  "replace_af_with": [
-                    "target/release/deployer"
-                  ]
+                  "show_success_output": false,
+                  "show_bash_c": false
                 }
               ]
             }
           }
         },
         {
-          "title": "Install the binary",
-          "desc": "Got from `Install binary`. Copy the binary in `/home/username/.cargo/bin` directory",
-          "info": "bin-install@0.1.0",
+          "title": "Install to ~/.cargo/bin",
+          "desc": "",
+          "info": "install-to-cargo-bin@0.1.1",
           "tags": [
-            "rust"
+            "cargo"
           ],
           "action": {
-            "PostBuild": {
-              "supported_langs": [
-                "Rust"
-              ],
+            "Install": {
+              "target": {
+                "arch": "x86_64",
+                "os": "Linux",
+                "derivative": "any",
+                "version": "No"
+              },
               "commands": [
                 {
-                  "bash_c": "cp %af% ~/.cargo/bin",
+                  "bash_c": "cp -f <artifact> ~/.cargo/bin",
+                  "placeholders": [
+                    "<artifact>"
+                  ],
+                  "replacements": [
+                    [
+                      [
+                        "<artifact>",
+                        {
+                          "title": "target/release/deployer",
+                          "is_secret": false,
+                          "value": {
+                            "Plain": "target/release/deployer"
+                          }
+                        }
+                      ]
+                    ]
+                  ],
                   "ignore_fails": false,
-                  "af_placeholder": "%af%",
-                  "replace_af_with": [
-                    "target/release/deployer"
-                  ]
+                  "show_success_output": false,
+                  "show_bash_c": false
                 }
               ]
             }
@@ -141,6 +178,7 @@
   "artifacts": [
     "target/release/deployer"
   ],
+  "variables": [],
   "inplace_artifacts_into_project_root": [
     [
       "target/release/deployer",

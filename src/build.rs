@@ -5,11 +5,11 @@ use std::process::{Command, Stdio};
 use uuid::Uuid;
 
 use crate::{DEPLOY_CACHE_SUBDIR, DEPLOY_ARTIFACTS_SUBDIR, DEPLOY_CONF_FILE};
-use crate::actions::{Action, CustomCommand, ProjectCleanAction, BuildAction, PackAction, DeployAction};
+use crate::actions::{Action, CustomCommand, CheckAction, ProjectCleanAction, BuildAction, PackAction, DeployAction, ObserveAction};
 use crate::cmd::{BuildArgs, CleanArgs};
 use crate::configs::DeployerProjectOptions;
 use crate::pipelines::DescribedPipeline;
-use crate::rw::{copy_all, write, symlink, log};
+use crate::rw::{copy_all, remove_all, write, symlink, log};
 use crate::utils::get_current_working_dir;
 
 fn enplace_artifacts(
@@ -143,20 +143,23 @@ fn execute_pipeline(
     
     let (status, output) = match &action.action {
       Action::Custom(cmd) => cmd.execute(build_dir)?,
+      Action::Check(check) => check.execute(build_dir)?,
       Action::PreBuild(a) | Action::Build(a) | Action::PostBuild(a) | Action::Test(a) => a.execute(build_dir)?,
       Action::ProjectClean(pc_action) => pc_action.execute(build_dir)?,
       Action::Pack(a) | Action::Deliver(a) | Action::Install(a) => a.execute(build_dir)?,
       Action::ConfigureDeploy(a) | Action::Deploy(a) | Action::PostDeploy(a) => a.execute(build_dir)?,
+      Action::Observe(o_action) => o_action.execute(build_dir)?,
       Action::ForceArtifactsEnplace => {
         enplace_artifacts(config, build_dir, artifacts_dir, false)?;
         enplace_artifacts(config, build_dir, &build_dir.to_path_buf().join(DEPLOY_ARTIFACTS_SUBDIR), false)?;
         (true, vec!["Artifacts are enplaced successfully.".into()])
       },
-      _ => {
-        print!("{}", "not implemented! skip...".red());
-        stdout().flush()?;
+      Action::Interrupt => {
+        println!();
+        inquire::Confirm::new("The Pipeline is interrupted. Click `Enter` to continue").with_default(true).prompt()?;
         (true, vec![])
       },
+      
     };
     
     let status_str = match status {
@@ -185,11 +188,19 @@ fn compose_output(
   stdout: String,
   stderr: String,
   success: bool,
+  show_success_output: bool,
+  show_bash_c: bool,
 ) -> Vec<String> {
   let mut output = vec![];
   
+  if success && !show_success_output { return output }
+  
   if !stdout.trim().is_empty() || !stderr.trim().is_empty() {
-    output.push(format!("Executing `{}`:", bash_c_info));
+    if show_bash_c {
+      output.push(format!("Executing `{}`:", bash_c_info));
+    } else {
+      output.push("Executing the command:".to_string());
+    }
   }
   if !stdout.trim().is_empty() {
     let total = stdout.chars().filter(|c| *c == '\n').count();
@@ -220,9 +231,14 @@ impl Execute for CustomCommand {
   fn execute(&self, curr_dir: &Path) -> anyhow::Result<(bool, Vec<String>)> {
     let mut output = vec![];
     
-    if let Some(af_placeholder) = &self.af_placeholder {
-      for artifact in &self.replace_af_with {
-        let bash_c = self.bash_c.replace(af_placeholder, artifact);
+    if self.placeholders.is_some() && let Some(replacements) = &self.replacements {
+      for every_start in replacements {
+        let mut bash_c = self.bash_c.to_owned();
+        
+        for (from, to) in every_start {
+          bash_c = bash_c.replace(from, to.get_value()?);
+        }
+        
         let bash_c_info = format!(r#"/bin/bash -c "{}""#, bash_c).green();
         
         let command_output = Command::new("/bin/bash")
@@ -238,7 +254,14 @@ impl Execute for CustomCommand {
         
         let stdout_strs = String::from_utf8_lossy_owned(command_output.stdout);
         let stderr_strs = String::from_utf8_lossy_owned(command_output.stderr);
-        output.extend_from_slice(&compose_output(bash_c_info.to_string(), stdout_strs, stderr_strs, command_output.status.success()));
+        output.extend_from_slice(&compose_output(
+          bash_c_info.to_string(),
+          stdout_strs,
+          stderr_strs,
+          command_output.status.success(),
+          self.show_success_output,
+          self.show_bash_c,
+        ));
         
         if !self.ignore_fails && !command_output.status.success() {
           return Ok((false, output))
@@ -260,9 +283,47 @@ impl Execute for CustomCommand {
       
       let stdout_strs = String::from_utf8_lossy_owned(command_output.stdout);
       let stderr_strs = String::from_utf8_lossy_owned(command_output.stderr);
-      output.extend_from_slice(&compose_output(bash_c_info.to_string(), stdout_strs, stderr_strs, command_output.status.success()));
+      output.extend_from_slice(&compose_output(
+        bash_c_info.to_string(),
+        stdout_strs,
+        stderr_strs,
+        command_output.status.success(),
+        self.show_success_output,
+        self.show_bash_c,
+      ));
       
       if !self.ignore_fails && !command_output.status.success() {
+        return Ok((false, output))
+      }
+    }
+    
+    Ok((true, output))
+  }
+}
+
+impl Execute for CheckAction {
+  fn execute(&self, curr_dir: &Path) -> anyhow::Result<(bool, Vec<String>)> {
+    let mut output = vec![];
+    
+    let (status, command_out) = self.command.execute(curr_dir)?;
+    if !status && !self.command.ignore_fails {
+      return Ok((false, command_out))
+    }
+    
+    if let Some(re) = &self.success_when_found {
+      let text = command_out.join("\n");
+      if re.is_match(text.as_str()) { output.push(format!("Pattern `{}` found!", re.as_str().green())); }
+      else {
+        output.push(format!("Pattern `{}` not found!", re.as_str().green()));
+        return Ok((false, output))
+      }
+    }
+    
+    if let Some(re) = &self.success_when_not_found {
+      let text = command_out.join("\n");
+      if !re.is_match(text.as_str()) { output.push(format!("Pattern `{}` not found!", re.as_str().green())); }
+      else {
+        output.push(format!("Pattern `{}` found!", re.as_str().green()));
         return Ok((false, output))
       }
     }
@@ -274,6 +335,10 @@ impl Execute for CustomCommand {
 impl Execute for ProjectCleanAction {
   fn execute(&self, curr_dir: &Path) -> anyhow::Result<(bool, Vec<String>)> {
     let mut total_output = vec![];
+    
+    for entity in &self.to_remove {
+      remove_all(curr_dir.join(entity))?;
+    }
     
     for cmd in &self.additional_commands {
       let (status, out) = cmd.execute(curr_dir)?;
@@ -337,6 +402,12 @@ impl Execute for DeployAction {
     }
     
     Ok((true, total_output))
+  }
+}
+
+impl Execute for ObserveAction {
+  fn execute(&self, curr_dir: &Path) -> anyhow::Result<(bool, Vec<String>)> {
+    self.command.execute(curr_dir)
   }
 }
 
