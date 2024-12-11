@@ -43,7 +43,9 @@ The full JSON is:
   "title": "UPX Compress",
   "desc": "Compress the binary file with UPX.",
   "info": "upx-compress@0.1.0",
-  "tags": [],
+  "tags": [
+    "upx"
+  ],
   "action": {
     "PostBuild": {
       "supported_langs": [
@@ -51,16 +53,20 @@ The full JSON is:
         "Go",
         "C",
         "Cpp",
+        "Python",
         {
           "Other": "any"
         }
       ],
       "commands": [
         {
-          "bash_c": "upx %af%",
+          "bash_c": "upx <artifact>",
+          "placeholders": [
+            "<artifact>"
+          ],
           "ignore_fails": false,
-          "af_placeholder": "%af%",
-          "replace_af_with": []
+          "show_success_output": false,
+          "show_bash_c": false
         }
       ]
     }
@@ -127,10 +133,13 @@ The full JSON is:
           ],
           "commands": [
             {
-              "bash_c": "upx %af%",
+              "bash_c": "upx <artifact>",
+              "placeholders": [
+                "<artifact>"
+              ],
               "ignore_fails": false,
-              "af_placeholder": "%af%",
-              "replace_af_with": []
+              "show_success_output": false,
+              "show_bash_c": false
             }
           ]
         }
@@ -237,12 +246,27 @@ Deployer will consider you to specify some things (e.g., targets - for this proj
               ],
               "commands": [
                 {
-                  "bash_c": "upx %af%",
+                  "bash_c": "upx <artifact>",
+                  "placeholders": [
+                    "<artifact>"
+                  ],
+                  "replacements": [
+                    [
+                      [
+                        "<artifact>",
+                        {
+                          "title": "target/release/my-rust-project",
+                          "is_secret": false,
+                          "value": {
+                            "Plain": "target/release/my-rust-project"
+                          }
+                        }
+                      ]
+                    ]
+                  ],
                   "ignore_fails": false,
-                  "af_placeholder": "%af%",
-                  "replace_af_with": [
-                    "target/release/my-rust-project"
-                  ]
+                  "show_success_output": false,
+                  "show_bash_c": false
                 }
               ]
             }
