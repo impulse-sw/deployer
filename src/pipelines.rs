@@ -2,12 +2,17 @@ use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::process::exit;
 
-use crate::actions::{DescribedAction, ActionInfo, new_action, Edit, EditExtended};
+use crate::actions::{DescribedAction, new_action};
 use crate::cmd::{NewActionArgs, NewPipelineArgs, CatPipelineArgs, WithPipelineArgs};
 use crate::configs::{DeployerGlobalConfig, DeployerProjectOptions};
+use crate::entities::{
+  info::{PipelineInfo, info2str_simple, info2str, str2info},
+  targets::TargetDescription,
+  traits::{Edit, EditExtended},
+};
 use crate::hmap;
 use crate::rw::read_checked;
-use crate::utils::{info2str_simple, info2str, str2info, tags_custom_type};
+use crate::utils::tags_custom_type;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub(crate) struct DescribedPipeline {
@@ -26,6 +31,11 @@ pub(crate) struct DescribedPipeline {
   /// Если не установлен, считается как `false`.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub(crate) default: Option<bool>,
+  /// Информация для проекта: зависит ли пайплайн от какого-либо таргета.
+  /// 
+  /// Если зависит, то пайплайн будет выполняться в зависимости от 
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) target_dependable: Option<TargetDescription>,
 }
 
 impl DescribedPipeline {
@@ -52,6 +62,7 @@ impl DescribedPipeline {
       tags,
       actions: selected_actions_ordered,
       default: None,
+      target_dependable: None,
     };
     
     Ok(described_pipeline)
@@ -81,8 +92,6 @@ impl DescribedPipeline {
     Ok(())
   }
 }
-
-pub(crate) type PipelineInfo = ActionInfo;
 
 /// Перечисляет все доступные пайплайны.
 pub(crate) fn list_pipelines(

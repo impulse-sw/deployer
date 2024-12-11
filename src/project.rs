@@ -1,9 +1,13 @@
 use colored::Colorize;
 
-use crate::actions::{ProgrammingLanguage, select_programming_languages, TargetDescription, Edit, EditExtended};
+use crate::entities::programming_languages::{ProgrammingLanguage, specify_programming_languages};
 use crate::configs::{DeployerProjectOptions, DeployerGlobalConfig};
+use crate::entities::{
+  targets::TargetDescription,
+  traits::{Edit, EditExtended},
+  variables::Variable,
+};
 use crate::hmap;
-use crate::variables::Variable;
 
 impl DeployerProjectOptions {
   pub(crate) fn init_from_prompt(&mut self) -> anyhow::Result<()> {
@@ -13,7 +17,7 @@ impl DeployerProjectOptions {
     
     self.cache_files.push(".git".to_string());
     println!("Please, specify the project's programming languages to setup default cache folders.");
-    self.langs = select_programming_languages()?;
+    self.langs = specify_programming_languages()?;
     for lang in &self.langs {
       match lang {
         ProgrammingLanguage::Rust => self.cache_files.extend_from_slice(&["Cargo.lock".to_string(), "target".to_string()]),
