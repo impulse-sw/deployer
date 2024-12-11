@@ -1,20 +1,17 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::actions::{
-  TargetDescription,
-  DescribedAction,
-  // DescribedDependency,
-  Action,
-  ActionInfo,
-  BuildAction,
-  ProgrammingLanguage,
-  CustomCommand,
-};
+use crate::actions::{DescribedAction, Action, buildlike::BuildAction};
 use crate::pipelines::DescribedPipeline;
+use crate::entities::{
+  custom_command::CustomCommand,
+  info::{ActionInfo, info2str_simple},
+  targets::TargetDescription,
+  programming_languages::ProgrammingLanguage,
+  variables::Variable,
+};
 use crate::hmap;
-use crate::utils::{info2str_simple, ordered_map};
-use crate::variables::Variable;
+use crate::utils::ordered_map;
 
 /// Конфигурация проекта.
 #[derive(Deserialize, Serialize, Default, Debug)]

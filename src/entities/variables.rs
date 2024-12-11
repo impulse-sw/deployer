@@ -1,7 +1,7 @@
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 
-use crate::actions::Edit;
+use crate::entities::traits::Edit;
 use crate::hmap;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

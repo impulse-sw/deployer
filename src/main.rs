@@ -15,8 +15,8 @@ mod build;
 
 mod actions;
 mod pipelines;
+mod entities;
 mod project;
-mod variables;
 
 use crate::actions::{list_actions, new_action, remove_action, cat_action, edit_action};
 use crate::cmd::{Cli, DeployerExecType, ListType, NewType, RemoveType, CatType, EditType};
