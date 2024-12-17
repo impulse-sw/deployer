@@ -49,8 +49,12 @@ compile_error!("`deployer` can't work with non-Unix systems.");
 
 fn main() {
   std::panic::set_hook(Box::new(|e| {
-    eprintln!();
-    eprintln!("An error occured: {}", e);
+    let err = e.to_string();
+    if err.contains("called `Result::unwrap()` on an `Err` value: ") {
+      eprintln!("{}", err.split("called `Result::unwrap()` on an `Err` value: ").last().unwrap());
+    } else {
+      eprintln!("{}", err.split('\n').last().unwrap());
+    }
     std::process::exit(1);
   }));
   

@@ -8,7 +8,7 @@ use crate::configs::{DeployerGlobalConfig, DeployerProjectOptions};
 use crate::entities::{
   info::{PipelineInfo, info2str_simple, info2str, str2info},
   targets::TargetDescription,
-  traits::{Edit, EditExtended},
+  traits::EditExtended,
 };
 use crate::hmap;
 use crate::rw::read_checked;
@@ -68,7 +68,7 @@ impl DescribedPipeline {
     Ok(described_pipeline)
   }
   
-  pub(crate) fn edit_pipeline_from_prompt(&mut self) -> anyhow::Result<()> {
+  pub(crate) fn edit_pipeline_from_prompt(&mut self, globals: &mut DeployerGlobalConfig) -> anyhow::Result<()> {
     let actions = vec![
       "Edit title",
       "Edit description",
@@ -84,7 +84,7 @@ impl DescribedPipeline {
         "Edit title" => self.title = inquire::Text::new("Write the Action's full name:").prompt()?,
         "Edit description" => self.desc = inquire::Text::new("Write the Action's description:").prompt()?,
         "Edit tags" => self.tags = tags_custom_type("Write Action's tags, if any:").prompt()?,
-        "Edit Pipeline's Actions" => self.actions.edit_from_prompt()?,
+        "Edit Pipeline's Actions" => self.actions.edit_from_prompt(globals)?,
         _ => {},
       }
     }
@@ -409,12 +409,17 @@ pub(crate) fn edit_pipeline(
   globals: &mut DeployerGlobalConfig,
   args: &CatPipelineArgs,
 ) -> anyhow::Result<()> {
-  let pipeline = match globals.pipelines_registry.get_mut(&args.pipeline_short_info_and_version) {
-    None => exit(1),
-    Some(pipeline) => pipeline,
+  let mut pipeline = match globals.pipelines_registry.contains_key(&args.pipeline_short_info_and_version) {
+    false => panic!("There is no such Pipeline!"),
+    true => {
+      let pipeline = globals.pipelines_registry.get(&args.pipeline_short_info_and_version).unwrap().clone();
+      globals.pipelines_registry.remove(&args.pipeline_short_info_and_version);
+      pipeline
+    },
   };
   
-  pipeline.edit_pipeline_from_prompt()?;
+  pipeline.edit_pipeline_from_prompt(globals)?;
+  globals.pipelines_registry.insert(info2str_simple(&pipeline.info), pipeline);
   
   Ok(())
 }
@@ -439,7 +444,7 @@ impl EditExtended<DeployerGlobalConfig> for Vec<DescribedPipeline> {
           "Reorder Pipelines" => self.reorder(opts)?,
           "Add Pipeline" => self.add_item(opts)?,
           "Remove Pipeline" => self.remove_item(opts)?,
-          s if cmap.contains_key(s) => cmap.get_mut(s).unwrap().edit_pipeline_from_prompt()?,
+          s if cmap.contains_key(s) => cmap.get_mut(s).unwrap().edit_pipeline_from_prompt(opts)?,
           _ => {},
         }
       } else { break }
@@ -473,7 +478,28 @@ impl EditExtended<DeployerGlobalConfig> for Vec<DescribedPipeline> {
   }
   
   fn add_item(&mut self, opts: &mut DeployerGlobalConfig) -> anyhow::Result<()> {
-    self.push(DescribedPipeline::new_from_prompt(opts)?);
+    use inquire::Select;
+    
+    const USE_ANOTHER: &str = "· Specify another Pipeline";
+    
+    let mut h = hmap!();
+    let mut k = vec![];
+    
+    for pipeline in opts.pipelines_registry.values() {
+      let key = format!("Pipeline `{}` - `{}`", pipeline.title, info2str_simple(&pipeline.info));
+      k.push(key.clone());
+      h.insert(key, pipeline);
+    }
+    
+    k.push(USE_ANOTHER.to_string());
+    
+    let selected = Select::new("Choose a Pipeline to add:", k).prompt()?;
+    
+    if selected.as_str() == USE_ANOTHER {
+      self.push(DescribedPipeline::new_from_prompt(opts)?);
+    } else {
+      self.push((**h.get(&selected).ok_or(anyhow::anyhow!("Can't get specified Pipeline!"))?).clone());
+    }
     Ok(())
   }
   

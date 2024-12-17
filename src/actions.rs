@@ -24,7 +24,7 @@ use crate::entities::{
   info::{ActionInfo, info2str, str2info, info2str_simple},
   programming_languages::{ProgrammingLanguage, specify_programming_languages},
   targets::TargetDescription,
-  traits::Edit,
+  traits::{Edit, EditExtended},
   variables::Variable,
 };
 use crate::hmap;
@@ -88,7 +88,7 @@ pub(crate) enum Action {
 }
 
 impl DescribedAction {
-  pub(crate) fn new_from_prompt() -> anyhow::Result<Self> {
+  pub(crate) fn new_from_prompt(opts: &mut DeployerGlobalConfig) -> anyhow::Result<Self> {
     use inquire::{Select, Text};
     
     let short_name = Text::new("Write the Action's short name:").prompt()?;
@@ -244,6 +244,17 @@ impl DescribedAction {
       tags,
       action,
     };
+    
+    if
+      opts.actions_registry.contains_key(&info2str_simple(&described_action.info)) &&
+      !inquire::Confirm::new(&format!(
+        "Actions Registry already have `{}` Action. Do you want to override it? (y/n)", info2str_simple(&described_action.info))
+      ).prompt()?
+    {
+      exit(0);
+    }
+    
+    opts.actions_registry.insert(info2str_simple(&described_action.info), described_action.clone());
     
     Ok(described_action)
   }
@@ -478,8 +489,8 @@ impl DescribedAction {
   }
 }
 
-impl Edit for Vec<DescribedAction> {
-  fn edit_from_prompt(&mut self) -> anyhow::Result<()> {
+impl EditExtended<DeployerGlobalConfig> for Vec<DescribedAction> {
+  fn edit_from_prompt(&mut self, opts: &mut DeployerGlobalConfig) -> anyhow::Result<()> {
     loop {
       let mut cmap = hmap!();
       let mut cs = vec![];
@@ -495,9 +506,9 @@ impl Edit for Vec<DescribedAction> {
       
       if let Some(action) = inquire::Select::new("Select a concrete Action to change (hit `esc` when done):", cs).prompt_skippable()? {
         match action.as_str() {
-          "Reorder Actions" => self.reorder()?,
-          "Add Action" => self.add_item()?,
-          "Remove Action" => self.remove_item()?,
+          "Reorder Actions" => self.reorder(opts)?,
+          "Add Action" => self.add_item(opts)?,
+          "Remove Action" => self.remove_item(opts)?,
           s if cmap.contains_key(s) => cmap.get_mut(s).unwrap().edit_action_from_prompt()?,
           _ => {},
         }
@@ -507,7 +518,7 @@ impl Edit for Vec<DescribedAction> {
     Ok(())
   }
   
-  fn reorder(&mut self) -> anyhow::Result<()> {
+  fn reorder(&mut self, _opts: &mut DeployerGlobalConfig) -> anyhow::Result<()> {
     use inquire::ReorderableList;
     
     let mut h = hmap!();
@@ -531,12 +542,33 @@ impl Edit for Vec<DescribedAction> {
     Ok(())
   }
   
-  fn add_item(&mut self) -> anyhow::Result<()> {
-    self.push(DescribedAction::new_from_prompt()?);
+  fn add_item(&mut self, opts: &mut DeployerGlobalConfig) -> anyhow::Result<()> {
+    use inquire::Select;
+    
+    const USE_ANOTHER: &str = "· Specify another Action";
+    
+    let mut h = hmap!();
+    let mut k = vec![];
+    
+    for action in opts.actions_registry.values() {
+      let key = format!("Action `{}` - `{}`", action.title, info2str_simple(&action.info));
+      k.push(key.clone());
+      h.insert(key, action);
+    }
+    
+    k.push(USE_ANOTHER.to_string());
+    
+    let selected = Select::new("Choose an Action to add:", k).prompt()?;
+    
+    if selected.as_str() == USE_ANOTHER {
+      self.push(DescribedAction::new_from_prompt(opts)?);
+    } else {
+      self.push((**h.get(&selected).ok_or(anyhow::anyhow!("Can't get specified Action!"))?).clone());
+    }
     Ok(())
   }
   
-  fn remove_item(&mut self) -> anyhow::Result<()> {
+  fn remove_item(&mut self, _opts: &mut DeployerGlobalConfig) -> anyhow::Result<()> {
     let mut cmap = hmap!();
     let mut cs = vec![];
     
@@ -635,18 +667,7 @@ pub(crate) fn new_action(
     return Ok(action)
   }
   
-  let described_action = DescribedAction::new_from_prompt()?;
-  
-  if
-    actions.contains_key(&info2str_simple(&described_action.info)) &&
-    !inquire::Confirm::new(&format!(
-      "Actions Registry already have `{}` Action. Do you want to override it? (y/n)", info2str_simple(&described_action.info))
-    ).prompt()?
-  {
-    exit(0);
-  }
-  
-  actions.insert(info2str_simple(&described_action.info), described_action.clone());
+  let described_action = DescribedAction::new_from_prompt(globals)?;
   
   Ok(described_action)
 }
