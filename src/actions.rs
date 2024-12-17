@@ -448,7 +448,10 @@ impl DescribedAction {
             Action::ConfigureDeploy(a) => a.commands.edit_from_prompt()?,
             Action::Deploy(a) => a.commands.edit_from_prompt()?,
             Action::PostDeploy(a) => a.commands.edit_from_prompt()?,
-            Action::Interrupt | Action::Custom(_) | Action::Check(_) | Action::ForceArtifactsEnplace | Action::Observe(_) => {},
+            Action::Check(a) => a.edit_check_from_prompt()?,
+            Action::Observe(a) => a.command.edit_command_from_prompt()?,
+            Action::Custom(a) => a.edit_command_from_prompt()?,
+            Action::Interrupt | Action::ForceArtifactsEnplace => {},
           }
         },
         "Edit regexes" if let Action::Check(c_action) = &mut self.action => c_action.change_regexes_from_prompt()?,
