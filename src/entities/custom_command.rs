@@ -128,6 +128,7 @@ impl CustomCommand {
         "Change command failure ignorance",
         "Change whether command is displayed or not on build stage",
         "Change whether command output is displayed or not when it executed successfully",
+        "Change command executing only at fresh builds",
       ],
     ).prompt_skippable()? {
       match action {
@@ -144,6 +145,13 @@ impl CustomCommand {
         },
         "Change whether command output is displayed or not when it executed successfully" => {
           self.show_success_output = inquire::Confirm::new("Show an output of command if it executed successfully?").with_default(false).prompt()?;
+        },
+        "Change command executing only at fresh builds" => {
+          self.only_when_fresh = if inquire::Confirm::new("Start a command only in fresh builds?").with_default(false).prompt()? {
+            Some(true)
+          } else {
+            None
+          };
         },
         _ => {},
       }
@@ -259,7 +267,9 @@ impl Execute for CustomCommand {
     let mut output = vec![];
     
     if !env.new_build && self.only_when_fresh.is_some_and(|v| v) {
-      output.push("Skip a command due to not a fresh build...".to_string());
+      if *crate::rw::VERBOSE.wait() {
+        output.push("Skip a command due to not a fresh build...".to_string());
+      }
       return Ok((true, output))
     }
     
