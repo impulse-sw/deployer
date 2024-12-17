@@ -679,8 +679,12 @@ fn collect_multiple_commands() -> anyhow::Result<Vec<CustomCommand>> {
   use inquire::Confirm;
   
   let mut commands = Vec::new();
-  while Confirm::new("Add command? (y/n)").prompt()? {
-    commands.push(CustomCommand::new_from_prompt()?);
+  let mut first = true;
+  while Confirm::new("Add command?").with_default(first).prompt()? {
+    if let Ok(command) = CustomCommand::new_from_prompt() {
+      commands.push(command);
+    }
+    first = false;
   }
   Ok(commands)
 }
