@@ -2,13 +2,14 @@ use colored::Colorize;
 use serde::{Deserialize, Serialize};
 
 use crate::hmap;
+use crate::entities::environment::BuildEnvironment;
 use crate::entities::variables::{Variable, VarTraits};
 use crate::entities::info::{ActionInfo, info2str_simple};
 use crate::entities::traits::{Edit, Execute};
 use crate::utils::tags_custom_type;
 
 /// Команда, исполняемая в командной строке `bash`.
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub(crate) struct CustomCommand {
   /// Команда.
   pub(crate) bash_c: String,
@@ -29,6 +30,8 @@ pub(crate) struct CustomCommand {
   /// Потенциально команда может содержать уязвимые переменные, такие как: ключи, пароли, пути к чувствительным файлам и т.д.
   /// Их можно скрыть при сборке, если указать `false`.
   pub(crate) show_bash_c: bool,
+  /// Запускать ли действие только при новых сборках.
+  pub(crate) only_when_fresh: Option<bool>,
 }
 
 impl CustomCommand {
@@ -42,6 +45,11 @@ impl CustomCommand {
     let ignore_fails = inquire::Confirm::new("Ignore command failures?").with_default(false).prompt()?;
     let show_bash_c = inquire::Confirm::new("Show an entire command at build stage?").with_default(true).prompt()?;
     let show_success_output = inquire::Confirm::new("Show an output of command if it executed successfully?").with_default(false).prompt()?;
+    let only_when_fresh = if inquire::Confirm::new("Start a command only in fresh builds?").with_default(false).prompt()? {
+      Some(true)
+    } else {
+      None
+    };
     
     Ok(CustomCommand {
       bash_c,
@@ -49,6 +57,7 @@ impl CustomCommand {
       ignore_fails,
       show_bash_c,
       show_success_output,
+      only_when_fresh,
       replacements: None,
     })
   }
@@ -119,6 +128,7 @@ impl CustomCommand {
         "Change command failure ignorance",
         "Change whether command is displayed or not on build stage",
         "Change whether command output is displayed or not when it executed successfully",
+        "Change command executing only at fresh builds",
       ],
     ).prompt_skippable()? {
       match action {
@@ -135,6 +145,13 @@ impl CustomCommand {
         },
         "Change whether command output is displayed or not when it executed successfully" => {
           self.show_success_output = inquire::Confirm::new("Show an output of command if it executed successfully?").with_default(false).prompt()?;
+        },
+        "Change command executing only at fresh builds" => {
+          self.only_when_fresh = if inquire::Confirm::new("Start a command only in fresh builds?").with_default(false).prompt()? {
+            Some(true)
+          } else {
+            None
+          };
         },
         _ => {},
       }
@@ -246,8 +263,15 @@ impl Edit for Vec<CustomCommand> {
 }
 
 impl Execute for CustomCommand {
-  fn execute(&self, curr_dir: &std::path::Path) -> anyhow::Result<(bool, Vec<String>)> {
+  fn execute(&self, env: BuildEnvironment) -> anyhow::Result<(bool, Vec<String>)> {
     let mut output = vec![];
+    
+    if !env.new_build && self.only_when_fresh.is_some_and(|v| v) {
+      if *crate::rw::VERBOSE.wait() {
+        output.push("Skip a command due to not a fresh build...".to_string());
+      }
+      return Ok((true, output))
+    }
     
     if self.placeholders.is_some() && let Some(replacements) = &self.replacements {
       for every_start in replacements {
@@ -260,7 +284,7 @@ impl Execute for CustomCommand {
         let bash_c_info = format!(r#"/bin/bash -c "{}""#, bash_c).green();
         
         let command_output = std::process::Command::new("/bin/bash")
-          .current_dir(curr_dir)
+          .current_dir(env.build_dir)
           .arg("-c")
           .arg(&bash_c)
           .stdout(std::process::Stdio::piped())
@@ -289,7 +313,7 @@ impl Execute for CustomCommand {
       let bash_c_info = format!(r#"/bin/bash -c "{}""#, self.bash_c.as_str()).green();
       
       let command_output = std::process::Command::new("/bin/bash")
-        .current_dir(curr_dir)
+        .current_dir(env.build_dir)
         .arg("-c")
         .arg(self.bash_c.as_str())
         .stdout(std::process::Stdio::piped())

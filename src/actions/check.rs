@@ -3,6 +3,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::entities::{
+  environment::BuildEnvironment,
   custom_command::CustomCommand,
   info::ActionInfo,
   traits::Execute,
@@ -18,6 +19,20 @@ pub(crate) struct CheckAction {
   pub(crate) success_when_found: Option<Regex>,
   #[serde(serialize_with = "regexopt2str", deserialize_with = "str2regexopt")]
   pub(crate) success_when_not_found: Option<Regex>,
+}
+
+impl PartialEq for CheckAction {
+  fn eq(&self, other: &Self) -> bool {
+    self.command.eq(&other.command) &&
+    (
+      (self.success_when_found.is_none() && other.success_when_found.is_none()) ||
+      (self.success_when_found.as_ref().is_some_and(|a| other.success_when_found.as_ref().is_some_and(|b| a.as_str().eq(b.as_str()))))
+    ) &&
+    (
+      (self.success_when_not_found.is_none() && other.success_when_not_found.is_none()) ||
+      (self.success_when_not_found.as_ref().is_some_and(|a| other.success_when_not_found.as_ref().is_some_and(|b| a.as_str().eq(b.as_str()))))
+    )
+  }
 }
 
 impl CheckAction {
@@ -55,10 +70,10 @@ impl CheckAction {
 }
 
 impl Execute for CheckAction {
-  fn execute(&self, curr_dir: &std::path::Path) -> anyhow::Result<(bool, Vec<String>)> {
+  fn execute(&self, env: BuildEnvironment) -> anyhow::Result<(bool, Vec<String>)> {
     let mut output = vec![];
     
-    let (status, command_out) = self.command.execute(curr_dir)?;
+    let (status, command_out) = self.command.execute(env)?;
     if !status && !self.command.ignore_fails {
       return Ok((false, command_out))
     }

@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub(crate) struct Info {
   pub(crate) short_name: String,
   pub(crate) version: String,

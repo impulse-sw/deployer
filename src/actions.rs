@@ -31,7 +31,7 @@ use crate::hmap;
 use crate::rw::read_checked;
 use crate::utils::tags_custom_type;
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub(crate) struct DescribedAction {
   pub(crate) title: String,
   pub(crate) desc: String,
@@ -43,7 +43,7 @@ pub(crate) struct DescribedAction {
   pub(crate) action: Action,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub(crate) enum Action {
   /// Действие прерывания. Используется, когда пользователю необходимо выполнить действия самостоятельно.
   Interrupt,
@@ -162,6 +162,7 @@ impl DescribedAction {
             ignore_fails,
             show_success_output: true,
             show_bash_c: false,
+            only_when_fresh: None,
           },
         })
       },

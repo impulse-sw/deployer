@@ -14,7 +14,7 @@ use crate::hmap;
 use crate::utils::ordered_map;
 
 /// Конфигурация проекта.
-#[derive(Deserialize, Serialize, Default, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Default, Debug)]
 pub(crate) struct DeployerProjectOptions {
   /// Название проекта.
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -83,6 +83,7 @@ impl Default for DeployerGlobalConfig {
           ignore_fails: false,
           show_success_output: false,
           show_bash_c: true,
+          only_when_fresh: None,
         }],
       })
     });

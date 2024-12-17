@@ -1,10 +1,13 @@
 use colored::Colorize;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use uuid::Uuid;
 
 use crate::{DEPLOY_CACHE_SUBDIR, DEPLOY_ARTIFACTS_SUBDIR, DEPLOY_CONF_FILE};
 use crate::actions::*;
-use crate::entities::traits::Execute;
+use crate::entities::{
+  traits::Execute,
+  environment::BuildEnvironment,
+};
 use crate::cmd::{BuildArgs, CleanArgs};
 use crate::configs::DeployerProjectOptions;
 use crate::pipelines::DescribedPipeline;
@@ -13,19 +16,18 @@ use crate::utils::get_current_working_dir;
 
 fn enplace_artifacts(
   config: &DeployerProjectOptions,
-  build_path: &Path,
-  artifacts_dir: &Path,
+  env: BuildEnvironment,
   panic_when_not_found: bool,
 ) -> anyhow::Result<()> {
   let mut ignore = vec![DEPLOY_ARTIFACTS_SUBDIR];
   ignore.extend_from_slice(&(config.cache_files.iter().map(|c| c.as_str()).collect::<Vec<_>>()));
   
   for (from, to) in &config.inplace_artifacts_into_project_root {
-    let artifact_path = build_path.join(from);
+    let artifact_path = env.build_dir.join(from);
     if !std::fs::exists(artifact_path.clone())? {
       if panic_when_not_found { panic!("There is no `{:?}` artifact!", artifact_path); }
     } else if artifact_path.as_path().is_dir() || artifact_path.as_path().is_file() {
-      copy_all(artifact_path.as_path(), artifacts_dir.join(to).as_path(), &ignore)?;
+      copy_all(artifact_path.as_path(), env.artifacts_dir.join(to).as_path(), &ignore)?;
     }
   }
   
@@ -37,6 +39,10 @@ pub(crate) fn build(
   cache_dir: &str,
   args: &mut BuildArgs,
 ) -> anyhow::Result<()> {
+  if *config == Default::default() { panic!("Config is invalid!"); }
+  
+  let mut new_build = false;
+  
   if
     let Some(pipeline_tag) = &args.pipeline_tag &&
     !config.pipelines.iter().any(|p| p.title.as_str() == pipeline_tag.as_str())
@@ -47,6 +53,7 @@ pub(crate) fn build(
   let mut build_path = PathBuf::new();
   build_path.push(cache_dir);
   build_path.push(DEPLOY_CACHE_SUBDIR);
+  if !build_path.exists() { new_build = true; }
   std::fs::create_dir_all(build_path.as_path()).unwrap_or_else(|_| panic!("Can't create `{:?}` folder!", build_path));
   
   let curr_dir = std::env::current_dir().expect("Can't get current dir!");
@@ -96,26 +103,33 @@ pub(crate) fn build(
     }
   }
   
+  let env = BuildEnvironment {
+    build_dir: &build_path,
+    artifacts_dir: &artifacts_dir,
+    new_build,
+    silent_build: args.silent,
+  };
+  
   if
     let Some(pipeline_tag) = &args.pipeline_tag &&
     let Some(pipeline) = config.pipelines.iter().find(|p| p.title.as_str() == pipeline_tag)
   {
-    execute_pipeline(config, args.silent, pipeline, &build_path, &artifacts_dir)?;
+    execute_pipeline(config, env, pipeline)?;
   } else {
     if config.pipelines.is_empty() {
       anyhow::bail!("The pipelines' list is empty! Check the config file for errors.")
     }
     
     if let Some(pipeline) = &config.pipelines.iter().find(|p| p.default.is_some_and(|v| v)) {
-      execute_pipeline(config, args.silent, pipeline, &build_path, &artifacts_dir)?;
+      execute_pipeline(config, env, pipeline)?;
     } else {
       for pipeline in &config.pipelines {
-        execute_pipeline(config, args.silent, pipeline, &build_path, &artifacts_dir)?;
+        execute_pipeline(config, env, pipeline)?;
       }
     }
   }
   
-  enplace_artifacts(config, &build_path, &artifacts_dir, true)?;
+  enplace_artifacts(config, env, true)?;
   
   println!("Build path: {}", build_path.to_str().expect("Can't convert `Path` to string!"));
   
@@ -124,10 +138,8 @@ pub(crate) fn build(
 
 fn execute_pipeline(
   config: &DeployerProjectOptions,
-  silent: bool,
+  env: BuildEnvironment,
   pipeline: &DescribedPipeline,
-  build_dir: &Path,
-  artifacts_dir: &Path,
 ) -> anyhow::Result<()> {
   use std::io::{stdout, Write};
   use std::time::Instant;
@@ -141,16 +153,21 @@ fn execute_pipeline(
     let now = Instant::now();
     
     let (status, output) = match &action.action {
-      Action::Custom(cmd) => cmd.execute(build_dir)?,
-      Action::Check(check) => check.execute(build_dir)?,
-      Action::PreBuild(a) | Action::Build(a) | Action::PostBuild(a) | Action::Test(a) => a.execute(build_dir)?,
-      Action::ProjectClean(pc_action) => pc_action.execute(build_dir)?,
-      Action::Pack(a) | Action::Deliver(a) | Action::Install(a) => a.execute(build_dir)?,
-      Action::ConfigureDeploy(a) | Action::Deploy(a) | Action::PostDeploy(a) => a.execute(build_dir)?,
-      Action::Observe(o_action) => o_action.execute(build_dir)?,
+      Action::Custom(cmd) => cmd.execute(env)?,
+      Action::Check(check) => check.execute(env)?,
+      Action::PreBuild(a) | Action::Build(a) | Action::PostBuild(a) | Action::Test(a) => a.execute(env)?,
+      Action::ProjectClean(pc_action) => pc_action.execute(env)?,
+      Action::Pack(a) | Action::Deliver(a) | Action::Install(a) => a.execute(env)?,
+      Action::ConfigureDeploy(a) | Action::Deploy(a) | Action::PostDeploy(a) => a.execute(env)?,
+      Action::Observe(o_action) => o_action.execute(env)?,
       Action::ForceArtifactsEnplace => {
-        enplace_artifacts(config, build_dir, artifacts_dir, false)?;
-        enplace_artifacts(config, build_dir, &build_dir.to_path_buf().join(DEPLOY_ARTIFACTS_SUBDIR), false)?;
+        enplace_artifacts(config, env, false)?;
+        
+        let mut modified_env = env;
+        let artifacts_dir = modified_env.build_dir.to_path_buf().join(DEPLOY_ARTIFACTS_SUBDIR);
+        modified_env.artifacts_dir = &artifacts_dir;
+        enplace_artifacts(config, modified_env, false)?;
+        
         (true, vec!["Artifacts are enplaced successfully.".into()])
       },
       Action::Interrupt => {
@@ -170,7 +187,7 @@ fn execute_pipeline(
     println!("{} ({}).", status_str, format!("{:.2?}", elapsed).green());
     cntr += 1;
     
-    if !silent {
+    if !env.silent_build {
       for line in output { println!("{}", line); }
     }
     

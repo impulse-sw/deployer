@@ -1,3 +1,5 @@
+use crate::entities::environment::BuildEnvironment;
+
 pub(crate) trait Edit {
   fn edit_from_prompt(&mut self) -> anyhow::Result<()>;
   fn reorder(&mut self) -> anyhow::Result<()>;
@@ -13,5 +15,5 @@ pub(crate) trait EditExtended<T> {
 }
 
 pub(crate) trait Execute {
-  fn execute(&self, curr_dir: &std::path::Path) -> anyhow::Result<(bool, Vec<String>)>;
+  fn execute(&self, env: BuildEnvironment) -> anyhow::Result<(bool, Vec<String>)>;
 }
