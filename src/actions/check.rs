@@ -2,17 +2,21 @@ use colored::Colorize;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::entities::custom_command::CustomCommand;
-use crate::entities::traits::Execute;
+use crate::entities::{
+  custom_command::CustomCommand,
+  info::ActionInfo,
+  traits::Execute,
+  variables::Variable,
+};
 use crate::utils::{regexopt2str, str2regexopt, str2regex_simple};
 
 /// Команда, проверяющая вывод на определённое условие.
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub(crate) struct CheckAction {
   pub(crate) command: CustomCommand,
-  #[serde(serialize_with = "regexopt2str", deserialize_with = "str2regexopt", skip_serializing_if = "Option::is_none")]
+  #[serde(serialize_with = "regexopt2str", deserialize_with = "str2regexopt")]
   pub(crate) success_when_found: Option<Regex>,
-  #[serde(serialize_with = "regexopt2str", deserialize_with = "str2regexopt", skip_serializing_if = "Option::is_none")]
+  #[serde(serialize_with = "regexopt2str", deserialize_with = "str2regexopt")]
   pub(crate) success_when_not_found: Option<Regex>,
 }
 
@@ -36,6 +40,17 @@ impl CheckAction {
     }
     
     Ok(())
+  }
+  
+  pub(crate) fn prompt_setup_for_project(
+    &self,
+    info: &ActionInfo,
+    variables: &[Variable],
+    artifacts: &[String],
+  ) -> anyhow::Result<Self> {
+    let mut r = self.clone();
+    r.command = r.command.prompt_setup_for_project(info, variables, artifacts)?;
+    Ok(r)
   }
 }
 
@@ -77,6 +92,11 @@ pub(crate) fn specify_regex(for_what: &str) -> anyhow::Result<Regex> {
     regex_str = inquire::Text::new(
       &format!("Enter regex {} (or enter '/h' for help):", for_what)
     ).prompt()?;
+    
+    if let Err(e) = Regex::new(&regex_str) {
+      println!("The regex you've written is invalid due to: {:?}.", e);
+      continue
+    }
     
     if regex_str.as_str() != "/h" { break }
     println!("Guide: `{}`", "Regex Checks for Deployer".blue());
