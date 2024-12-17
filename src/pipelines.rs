@@ -217,8 +217,11 @@ fn collect_multiple_actions(
   use inquire::Confirm;
   
   let mut actions = Vec::new();
-  while Confirm::new("Add Action? (y/n)").prompt()? {
+  let mut first = true;
+  
+  while Confirm::new("Add Action?").with_default(first).prompt()? {
     actions.push(select_action(globals)?);
+    first = false;
   }
   Ok(actions)
 }
