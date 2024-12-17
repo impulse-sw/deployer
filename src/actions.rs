@@ -561,7 +561,9 @@ impl EditExtended<DeployerGlobalConfig> for Vec<DescribedAction> {
     let selected = Select::new("Choose an Action to add:", k).prompt()?;
     
     if selected.as_str() == USE_ANOTHER {
-      self.push(DescribedAction::new_from_prompt(opts)?);
+      if let Ok(action) = DescribedAction::new_from_prompt(opts) {
+        self.push(action);
+      }
     } else {
       self.push((**h.get(&selected).ok_or(anyhow::anyhow!("Can't get specified Action!"))?).clone());
     }
