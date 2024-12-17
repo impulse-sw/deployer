@@ -2,13 +2,14 @@ use colored::Colorize;
 use serde::{Deserialize, Serialize};
 
 use crate::hmap;
+use crate::entities::environment::BuildEnvironment;
 use crate::entities::variables::{Variable, VarTraits};
 use crate::entities::info::{ActionInfo, info2str_simple};
 use crate::entities::traits::{Edit, Execute};
 use crate::utils::tags_custom_type;
 
 /// Команда, исполняемая в командной строке `bash`.
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub(crate) struct CustomCommand {
   /// Команда.
   pub(crate) bash_c: String,
@@ -246,7 +247,7 @@ impl Edit for Vec<CustomCommand> {
 }
 
 impl Execute for CustomCommand {
-  fn execute(&self, curr_dir: &std::path::Path) -> anyhow::Result<(bool, Vec<String>)> {
+  fn execute(&self, env: BuildEnvironment) -> anyhow::Result<(bool, Vec<String>)> {
     let mut output = vec![];
     
     if self.placeholders.is_some() && let Some(replacements) = &self.replacements {
@@ -260,7 +261,7 @@ impl Execute for CustomCommand {
         let bash_c_info = format!(r#"/bin/bash -c "{}""#, bash_c).green();
         
         let command_output = std::process::Command::new("/bin/bash")
-          .current_dir(curr_dir)
+          .current_dir(env.build_dir)
           .arg("-c")
           .arg(&bash_c)
           .stdout(std::process::Stdio::piped())
@@ -289,7 +290,7 @@ impl Execute for CustomCommand {
       let bash_c_info = format!(r#"/bin/bash -c "{}""#, self.bash_c.as_str()).green();
       
       let command_output = std::process::Command::new("/bin/bash")
-        .current_dir(curr_dir)
+        .current_dir(env.build_dir)
         .arg("-c")
         .arg(self.bash_c.as_str())
         .stdout(std::process::Stdio::piped())

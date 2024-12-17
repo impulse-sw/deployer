@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::entities::traits::Edit;
 use crate::hmap;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub(crate) struct Variable {
   pub(crate) title: String,
   pub(crate) is_secret: bool,
@@ -65,7 +65,7 @@ impl<'a> Variable {
   }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub(crate) enum VarValue {
   Plain(String),
   // FromEnvFile(FromEnvFile),

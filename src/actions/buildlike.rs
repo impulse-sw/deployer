@@ -1,12 +1,13 @@
 use serde::{Deserialize, Serialize};
 
 use crate::entities::{
+  environment::BuildEnvironment,
   custom_command::CustomCommand,
   programming_languages::ProgrammingLanguage,
   traits::Execute,
 };
 
-#[derive(Deserialize, Serialize, Default, Clone, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Default, Clone, Debug)]
 pub(crate) struct BuildAction {
   pub(crate) supported_langs: Vec<ProgrammingLanguage>,
   pub(crate) commands: Vec<CustomCommand>,
@@ -17,11 +18,11 @@ pub(crate) type PostBuildAction = BuildAction;
 pub(crate) type TestAction = BuildAction;
 
 impl Execute for BuildAction {
-  fn execute(&self, curr_dir: &std::path::Path) -> anyhow::Result<(bool, Vec<String>)> {
+  fn execute(&self, env: BuildEnvironment) -> anyhow::Result<(bool, Vec<String>)> {
     let mut total_output = vec![];
     
     for cmd in &self.commands {
-      let (status, out) = cmd.execute(curr_dir)?;
+      let (status, out) = cmd.execute(env)?;
       total_output.extend_from_slice(&out);
       
       if !status {

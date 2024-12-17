@@ -14,7 +14,7 @@ use crate::hmap;
 use crate::rw::read_checked;
 use crate::utils::tags_custom_type;
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub(crate) struct DescribedPipeline {
   /// Заголовок Пайплайна.
   pub(crate) title: String,

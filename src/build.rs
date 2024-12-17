@@ -1,10 +1,13 @@
 use colored::Colorize;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use uuid::Uuid;
 
 use crate::{DEPLOY_CACHE_SUBDIR, DEPLOY_ARTIFACTS_SUBDIR, DEPLOY_CONF_FILE};
 use crate::actions::*;
-use crate::entities::traits::Execute;
+use crate::entities::{
+  traits::Execute,
+  environment::BuildEnvironment,
+};
 use crate::cmd::{BuildArgs, CleanArgs};
 use crate::configs::DeployerProjectOptions;
 use crate::pipelines::DescribedPipeline;
@@ -13,19 +16,18 @@ use crate::utils::get_current_working_dir;
 
 fn enplace_artifacts(
   config: &DeployerProjectOptions,
-  build_path: &Path,
-  artifacts_dir: &Path,
+  env: BuildEnvironment,
   panic_when_not_found: bool,
 ) -> anyhow::Result<()> {
   let mut ignore = vec![DEPLOY_ARTIFACTS_SUBDIR];
   ignore.extend_from_slice(&(config.cache_files.iter().map(|c| c.as_str()).collect::<Vec<_>>()));
   
   for (from, to) in &config.inplace_artifacts_into_project_root {
-    let artifact_path = build_path.join(from);
+    let artifact_path = env.build_dir.join(from);
     if !std::fs::exists(artifact_path.clone())? {
       if panic_when_not_found { panic!("There is no `{:?}` artifact!", artifact_path); }
     } else if artifact_path.as_path().is_dir() || artifact_path.as_path().is_file() {
-      copy_all(artifact_path.as_path(), artifacts_dir.join(to).as_path(), &ignore)?;
+      copy_all(artifact_path.as_path(), env.artifacts_dir.join(to).as_path(), &ignore)?;
     }
   }
   
