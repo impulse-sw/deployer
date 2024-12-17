@@ -448,7 +448,10 @@ impl DescribedAction {
             Action::ConfigureDeploy(a) => a.commands.edit_from_prompt()?,
             Action::Deploy(a) => a.commands.edit_from_prompt()?,
             Action::PostDeploy(a) => a.commands.edit_from_prompt()?,
-            Action::Interrupt | Action::Custom(_) | Action::Check(_) | Action::ForceArtifactsEnplace | Action::Observe(_) => {},
+            Action::Check(a) => a.edit_check_from_prompt()?,
+            Action::Observe(a) => a.command.edit_command_from_prompt()?,
+            Action::Custom(a) => a.edit_command_from_prompt()?,
+            Action::Interrupt | Action::ForceArtifactsEnplace => {},
           }
         },
         "Edit regexes" if let Action::Check(c_action) = &mut self.action => c_action.change_regexes_from_prompt()?,
@@ -561,7 +564,9 @@ impl EditExtended<DeployerGlobalConfig> for Vec<DescribedAction> {
     let selected = Select::new("Choose an Action to add:", k).prompt()?;
     
     if selected.as_str() == USE_ANOTHER {
-      self.push(DescribedAction::new_from_prompt(opts)?);
+      if let Ok(action) = DescribedAction::new_from_prompt(opts) {
+        self.push(action);
+      }
     } else {
       self.push((**h.get(&selected).ok_or(anyhow::anyhow!("Can't get specified Action!"))?).clone());
     }
@@ -677,8 +682,12 @@ fn collect_multiple_commands() -> anyhow::Result<Vec<CustomCommand>> {
   use inquire::Confirm;
   
   let mut commands = Vec::new();
-  while Confirm::new("Add command? (y/n)").prompt()? {
-    commands.push(CustomCommand::new_from_prompt()?);
+  let mut first = true;
+  while Confirm::new("Add command?").with_default(first).prompt()? {
+    if let Ok(command) = CustomCommand::new_from_prompt() {
+      commands.push(command);
+    }
+    first = false;
   }
   Ok(commands)
 }

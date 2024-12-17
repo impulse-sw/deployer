@@ -45,11 +45,7 @@ impl CustomCommand {
     let ignore_fails = inquire::Confirm::new("Ignore command failures?").with_default(false).prompt()?;
     let show_bash_c = inquire::Confirm::new("Show an entire command at build stage?").with_default(true).prompt()?;
     let show_success_output = inquire::Confirm::new("Show an output of command if it executed successfully?").with_default(false).prompt()?;
-    let only_when_fresh = if inquire::Confirm::new("Start a command only in fresh builds?").with_default(false).prompt()? {
-      Some(true)
-    } else {
-      None
-    };
+    let only_when_fresh = Some(inquire::Confirm::new("Start a command only in fresh builds?").with_default(false).prompt()?);
     
     Ok(CustomCommand {
       bash_c,

@@ -496,7 +496,9 @@ impl EditExtended<DeployerGlobalConfig> for Vec<DescribedPipeline> {
     let selected = Select::new("Choose a Pipeline to add:", k).prompt()?;
     
     if selected.as_str() == USE_ANOTHER {
-      self.push(DescribedPipeline::new_from_prompt(opts)?);
+      if let Ok(pipeline) = DescribedPipeline::new_from_prompt(opts) {
+        self.push(pipeline);
+      }
     } else {
       self.push((**h.get(&selected).ok_or(anyhow::anyhow!("Can't get specified Pipeline!"))?).clone());
     }
