@@ -10,9 +10,9 @@ use crate::utils::{regexopt2str, str2regexopt, str2regex_simple};
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub(crate) struct CheckAction {
   pub(crate) command: CustomCommand,
-  #[serde(serialize_with = "regexopt2str", deserialize_with = "str2regexopt", skip_serializing_if = "Option::is_none")]
+  #[serde(serialize_with = "regexopt2str", deserialize_with = "str2regexopt")]
   pub(crate) success_when_found: Option<Regex>,
-  #[serde(serialize_with = "regexopt2str", deserialize_with = "str2regexopt", skip_serializing_if = "Option::is_none")]
+  #[serde(serialize_with = "regexopt2str", deserialize_with = "str2regexopt")]
   pub(crate) success_when_not_found: Option<Regex>,
 }
 
@@ -77,6 +77,11 @@ pub(crate) fn specify_regex(for_what: &str) -> anyhow::Result<Regex> {
     regex_str = inquire::Text::new(
       &format!("Enter regex {} (or enter '/h' for help):", for_what)
     ).prompt()?;
+    
+    if let Err(e) = Regex::new(&regex_str) {
+      println!("The regex you've written is invalid due to: {:?}.", e);
+      continue
+    }
     
     if regex_str.as_str() != "/h" { break }
     println!("Guide: `{}`", "Regex Checks for Deployer".blue());

@@ -12,7 +12,13 @@ pub(crate) fn read<T: DeserializeOwned + Default>(folder: impl AsRef<Path>, file
   path.push(folder);
   path.push(file);
   
-  read_checked(path).unwrap_or_default()
+  match read_checked(path) {
+    Err(e) => {
+      log(format!("Error on file read: {:?}", e));
+      Default::default()
+    },
+    Ok(v) => v,
+  }
 }
 
 pub(crate) fn read_checked<T: DeserializeOwned>(filepath: impl AsRef<Path>) -> anyhow::Result<T> {
