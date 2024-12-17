@@ -61,18 +61,14 @@ impl CheckAction {
     const EDIT_COMMAND: &str = "Edit check command";
     const EDIT_REGEXES: &str = "Edit regexes";
     
-    loop {
-      if let Some(selected) = inquire::Select::new(
-        "Specify an action for Check Action:",
-        vec![EDIT_COMMAND, EDIT_REGEXES],
-      ).prompt_skippable()? {
-        match selected {
-          EDIT_COMMAND => self.command.edit_command_from_prompt()?,
-          EDIT_REGEXES => self.change_regexes_from_prompt()?,
-          _ => {},
-        }
-      } else {
-        break
+    while let Some(selected) = inquire::Select::new(
+      "Specify an action for Check Action:",
+      vec![EDIT_COMMAND, EDIT_REGEXES],
+    ).prompt_skippable()? {
+      match selected {
+        EDIT_COMMAND => self.command.edit_command_from_prompt()?,
+        EDIT_REGEXES => self.change_regexes_from_prompt()?,
+        _ => {},
       }
     }
     
