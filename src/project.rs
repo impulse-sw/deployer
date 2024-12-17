@@ -315,6 +315,8 @@ pub(crate) fn edit_project(
   globals: &mut DeployerGlobalConfig,
   config: &mut DeployerProjectOptions,
 ) -> anyhow::Result<()> {
+  if *config == Default::default() { panic!("Config is invalid!"); }
+  
   config.edit_project_from_prompt(globals)?;
   Ok(())
 }

@@ -83,6 +83,7 @@ impl Default for DeployerGlobalConfig {
           ignore_fails: false,
           show_success_output: false,
           show_bash_c: true,
+          only_when_fresh: None,
         }],
       })
     });

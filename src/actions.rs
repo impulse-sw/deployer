@@ -162,6 +162,7 @@ impl DescribedAction {
             ignore_fails,
             show_success_output: true,
             show_bash_c: false,
+            only_when_fresh: None,
           },
         })
       },

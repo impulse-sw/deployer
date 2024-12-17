@@ -30,6 +30,8 @@ pub(crate) struct CustomCommand {
   /// Потенциально команда может содержать уязвимые переменные, такие как: ключи, пароли, пути к чувствительным файлам и т.д.
   /// Их можно скрыть при сборке, если указать `false`.
   pub(crate) show_bash_c: bool,
+  /// Запускать ли действие только при новых сборках.
+  pub(crate) only_when_fresh: Option<bool>,
 }
 
 impl CustomCommand {
@@ -43,6 +45,11 @@ impl CustomCommand {
     let ignore_fails = inquire::Confirm::new("Ignore command failures?").with_default(false).prompt()?;
     let show_bash_c = inquire::Confirm::new("Show an entire command at build stage?").with_default(true).prompt()?;
     let show_success_output = inquire::Confirm::new("Show an output of command if it executed successfully?").with_default(false).prompt()?;
+    let only_when_fresh = if inquire::Confirm::new("Start a command only in fresh builds?").with_default(false).prompt()? {
+      Some(true)
+    } else {
+      None
+    };
     
     Ok(CustomCommand {
       bash_c,
@@ -50,6 +57,7 @@ impl CustomCommand {
       ignore_fails,
       show_bash_c,
       show_success_output,
+      only_when_fresh,
       replacements: None,
     })
   }
@@ -249,6 +257,11 @@ impl Edit for Vec<CustomCommand> {
 impl Execute for CustomCommand {
   fn execute(&self, env: BuildEnvironment) -> anyhow::Result<(bool, Vec<String>)> {
     let mut output = vec![];
+    
+    if !env.new_build && self.only_when_fresh.is_some_and(|v| v) {
+      output.push("Skip a command due to not a fresh build...".to_string());
+      return Ok((true, output))
+    }
     
     if self.placeholders.is_some() && let Some(replacements) = &self.replacements {
       for every_start in replacements {
