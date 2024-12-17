@@ -164,15 +164,25 @@ impl CustomCommand {
 pub(crate) fn specify_bash_c() -> anyhow::Result<String> {
   let mut bash_c;
   loop {
-    bash_c = inquire::Text::new("Enter typical bash command (or enter '/h' for help):").prompt()?;
+    bash_c = inquire::Text::new("Enter typical shell command (or enter '/h' for help):").prompt()?;
     if bash_c.as_str() != "/h" { break }
-    println!("Guide: `{}`", "Bash Commands for Deployer".blue());
-    println!(">>> The usage of `bash` commands in Deployer is very simple.");
+    println!("Guide: `{}`", "Shell Commands for Deployer".blue());
+    println!(">>> The usage of shell commands in Deployer is very simple.");
     println!(">>> You can use `{}` for home directories, your default `{}` variable and so on.", "~".green(), "PATH".green());
     println!(">>> ");
     println!(">>> Also you can write your commands even when there are some unspecified variables:");
     println!(">>> `{}`", "g++ <input-file> -o <output-file>".green());
     println!(">>> `{}{}`", "docker compose run -e DEPLOY_KEY=".green(), "{{my very secret key}}".red());
+    println!(">>> ");
+    println!(">>> To specify shell for Deployer, use `DEPLOYER_SH_PATH` environment variable.");
+    println!(">>> By default: using `{}`.", "/bin/bash".green());
+    
+    let shell = match std::env::var("DEPLOYER_SH_PATH") {
+      Ok(path) => path.green().to_string(),
+      Err(_) => format!("unspecified (`{}`)", "/bin/bash".green()),
+    };
+    
+    println!(">>> The current value of `DEPLOYER_SH_PATH`: {}", shell);
   }
   
   Ok(bash_c)
@@ -273,6 +283,11 @@ impl Execute for CustomCommand {
       return Ok((true, output))
     }
     
+    let shell = match std::env::var("DEPLOYER_SH_PATH") {
+      Ok(path) => path,
+      Err(_) => "/bin/bash".to_string(),
+    };
+    
     if self.placeholders.is_some() && let Some(replacements) = &self.replacements {
       for every_start in replacements {
         let mut bash_c = self.bash_c.to_owned();
@@ -281,9 +296,9 @@ impl Execute for CustomCommand {
           bash_c = bash_c.replace(from, to.get_value()?);
         }
         
-        let bash_c_info = format!(r#"/bin/bash -c "{}""#, bash_c).green();
+        let bash_c_info = format!(r#"{} -c "{}""#, shell, bash_c).green();
         
-        let command_output = std::process::Command::new("/bin/bash")
+        let command_output = std::process::Command::new(&shell)
           .current_dir(env.build_dir)
           .arg("-c")
           .arg(&bash_c)
@@ -310,9 +325,9 @@ impl Execute for CustomCommand {
         }
       }
     } else {
-      let bash_c_info = format!(r#"/bin/bash -c "{}""#, self.bash_c.as_str()).green();
+      let bash_c_info = format!(r#"{} -c "{}""#, shell, self.bash_c.as_str()).green();
       
-      let command_output = std::process::Command::new("/bin/bash")
+      let command_output = std::process::Command::new(&shell)
         .current_dir(env.build_dir)
         .arg("-c")
         .arg(self.bash_c.as_str())
