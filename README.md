@@ -3,7 +3,7 @@
 Deployer is a relative simple, yet powerful localhost CI/CD instrument. It allows you to:
 
 - have your own actions and pipelines repositories (`Actions Registry` and `Pipelines Registry`) in a single JSON file
-- create actions and pipelines from TUI or JSON/YAML configuration files
+- create actions and pipelines from TUI or JSON\ configuration files
 - configure actions for specific project
 - check compatibility over actions and projects
 - and share your project build/deploy settings very quickly and without any dependencies.
@@ -151,7 +151,7 @@ The full JSON is:
 
 Note that you can change the inner content of Actions inside Pipelines, and also can change the inner content of Pipelines and their Actions if these Pipelines assigned to your project. The changes will not affect Actions and Pipelines from Deployer's Registries.
 
-You can view your Actions and Pipelines and get it in YAML by simple commands:
+You can view your Actions and Pipelines and get it in JSON by simple commands:
 
 ```bash
 deployer ls actions
