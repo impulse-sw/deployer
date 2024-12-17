@@ -2,8 +2,12 @@ use colored::Colorize;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::entities::custom_command::CustomCommand;
-use crate::entities::traits::Execute;
+use crate::entities::{
+  custom_command::CustomCommand,
+  info::ActionInfo,
+  traits::Execute,
+  variables::Variable,
+};
 use crate::utils::{regexopt2str, str2regexopt, str2regex_simple};
 
 /// Команда, проверяющая вывод на определённое условие.
@@ -36,6 +40,17 @@ impl CheckAction {
     }
     
     Ok(())
+  }
+  
+  pub(crate) fn prompt_setup_for_project(
+    &self,
+    info: &ActionInfo,
+    variables: &[Variable],
+    artifacts: &[String],
+  ) -> anyhow::Result<Self> {
+    let mut r = self.clone();
+    r.command = r.command.prompt_setup_for_project(info, variables, artifacts)?;
+    Ok(r)
   }
 }
 

@@ -362,6 +362,7 @@ impl DescribedAction {
   ) -> anyhow::Result<Self> {
     let action = match &self.action {
       Action::Custom(cmd) => Action::Custom(cmd.prompt_setup_for_project(&self.info, variables, artifacts)?),
+      Action::Check(cmd) => Action::Check(cmd.prompt_setup_for_project(&self.info, variables, artifacts)?),
       Action::PreBuild(pb_action) => Action::PreBuild(self.setup_buildlike_action(pb_action, langs, variables, artifacts)?),
       Action::Build(b_action) => Action::Build(self.setup_buildlike_action(b_action, langs, variables, artifacts)?),
       Action::PostBuild(pb_action) => Action::PostBuild(self.setup_buildlike_action(pb_action, langs, variables, artifacts)?),
@@ -374,7 +375,7 @@ impl DescribedAction {
       Action::Deploy(d_action) => Action::Deploy(self.setup_deploylike_action(d_action, deploy_toolkit, variables, artifacts)?),
       Action::PostDeploy(pd_action) => Action::PostDeploy(self.setup_deploylike_action(pd_action, deploy_toolkit, variables, artifacts)?),
       Action::Observe(o_action) => Action::Observe(self.setup_observe_action(o_action, variables, artifacts)?),
-      Action::Interrupt | Action::Check(_) | Action::ForceArtifactsEnplace => self.action.clone(),
+      Action::Interrupt | Action::ForceArtifactsEnplace => self.action.clone(),
     };
     
     let mut described_action = self.clone();
