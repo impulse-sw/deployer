@@ -107,7 +107,7 @@ pub(crate) fn list_pipelines(
     let pipeline_title = format!("[{}]", pipeline.title);
     let tags = if pipeline.tags.is_empty() { String::new() } else { format!(" (tags: {})", pipeline.tags.join(", ").as_str().blue().italic()) };
     println!("• {} {}{}", pipeline_info.blue().bold(), pipeline_title.green().bold(), tags);
-    println!("\t> {}", pipeline.desc.green().italic());
+    if !pipeline.desc.is_empty() { println!("\t> {}", pipeline.desc.green().italic()); }
   }
   
   Ok(())
