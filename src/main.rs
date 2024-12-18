@@ -43,7 +43,7 @@ static PROJECT_CONF: &str = "deploy-config.json";
 static GLOBAL_CONF: &str = "deploy-global.json";
 
 pub(crate) static CACHE_DIR: &str = "deploy-cache";
-// pub(crate) static LOGS_DIR: &str = "logs";
+pub(crate) static LOGS_DIR: &str = "logs";
 
 pub(crate) static ARTIFACTS_DIR: &str = "artifacts";
 
@@ -72,22 +72,16 @@ fn main() {
   
   // Определение рабочих директорий
   let cache_folder = if args.cache_folder.is_none() {
-    cache_dir()
-      .expect("Can't get `cache` directory's location automatically, please specify one.")
-      .to_str()
-      .expect("Can't convert `PathBuf` to `str` for `cache` folder!")
-      .to_string()
+    cache_dir().expect("Can't get `cache` directory's location automatically, please specify one.")
   } else {
-    args.cache_folder.as_ref().unwrap().to_string()
+    let path = std::path::PathBuf::new();
+    path.join(args.cache_folder.as_ref().unwrap())
   };
   let config_folder = if args.config_folder.is_none() {
-    config_dir()
-      .expect("Can't get `config` directory's location automatically, please specify one.")
-      .to_str()
-      .expect("Can't convert `PathBuf` to `str` for `config` folder!")
-      .to_string()
+    config_dir().expect("Can't get `config` directory's location automatically, please specify one.")
   } else {
-    args.config_folder.as_ref().unwrap().to_string()
+    let path = std::path::PathBuf::new();
+    path.join(args.config_folder.as_ref().unwrap())
   };
   
   // Чтение конфигов

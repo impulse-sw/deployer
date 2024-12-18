@@ -13,7 +13,7 @@ impl DeployerProjectOptions {
   pub(crate) fn init_from_prompt(&mut self) -> anyhow::Result<()> {
     use inquire::Text;
     
-    self.project_name = Text::new("Enter the project's name (or hit `esc`):").prompt_skippable()?;
+    self.project_name = Text::new("Enter the project's name:").prompt()?;
     
     self.cache_files.push(".git".to_string());
     println!("Please, specify the project's programming languages to setup default cache folders.");
@@ -56,7 +56,7 @@ impl DeployerProjectOptions {
       actions.clone(),
     ).prompt_skippable()? {
       match action {
-        "Edit project name" => self.project_name = inquire::Text::new("Enter the project's name (or hit `esc`):").prompt_skippable()?,
+        "Edit project name" => self.project_name = inquire::Text::new("Enter the project's name:").prompt()?,
         "Edit cache files" => self.cache_files.edit_from_prompt()?,
         "Edit programming languages" => self.langs.edit_from_prompt()?,
         "Edit targets" => self.targets.edit_from_prompt()?,

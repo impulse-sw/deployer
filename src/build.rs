@@ -1,5 +1,5 @@
 use colored::Colorize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 use crate::{CACHE_DIR, ARTIFACTS_DIR, PROJECT_CONF};
@@ -11,7 +11,7 @@ use crate::entities::{
 use crate::cmd::{BuildArgs, CleanArgs};
 use crate::configs::DeployerProjectOptions;
 use crate::pipelines::DescribedPipeline;
-use crate::rw::{copy_all, write, symlink, log};
+use crate::rw::{copy_all, write, symlink, log, generate_build_log_filepath, build_log};
 use crate::utils::get_current_working_dir;
 
 fn enplace_artifacts(
@@ -34,7 +34,7 @@ fn enplace_artifacts(
   Ok(())
 }
 
-pub(crate) fn prepare_artifacts_folder(
+fn prepare_artifacts_folder(
   current_dir: &std::path::Path,
 ) -> anyhow::Result<PathBuf> {
   let artifacts_dir = current_dir.join(ARTIFACTS_DIR);
@@ -43,10 +43,10 @@ pub(crate) fn prepare_artifacts_folder(
   Ok(artifacts_dir)
 }
 
-pub(crate) fn prepare_build_folder(
+fn prepare_build_folder(
   config: &mut DeployerProjectOptions,
   current_dir: &std::path::Path,
-  cache_dir: &str,
+  cache_dir: &Path,
   mut fresh: bool,
   link_cache: bool,
   copy_cache: bool,
@@ -103,7 +103,7 @@ pub(crate) fn prepare_build_folder(
 
 pub(crate) fn build(
   config: &mut DeployerProjectOptions,
-  cache_dir: &str,
+  cache_dir: &Path,
   args: &BuildArgs,
 ) -> anyhow::Result<()> {
   if *config == Default::default() { panic!("Config is invalid!"); }
@@ -128,6 +128,7 @@ pub(crate) fn build(
   
   let env = BuildEnvironment {
     build_dir: &build_path,
+    cache_dir,
     artifacts_dir: &artifacts_dir,
     new_build,
     silent_build: args.silent,
@@ -170,7 +171,15 @@ fn execute_pipeline(
   use std::io::{stdout, Write};
   use std::time::Instant;
   
+  let log_file = generate_build_log_filepath(
+    &config.project_name,
+    &pipeline.title,
+    env.cache_dir,
+  );
+  
   if !env.silent_build { println!("Starting the `{}` Pipeline...", pipeline.title); }
+  build_log(&log_file, &[format!("Starting the `{}` Pipeline...", pipeline.title)])?;
+  
   let mut cntr = 1usize;
   let total = pipeline.actions.len();
   for action in &pipeline.actions {
@@ -180,6 +189,7 @@ fn execute_pipeline(
       } else {
         println!("[{}/{}] `{}` Action... ", cntr, total, action.title.blue().italic());
       }
+      build_log(&log_file, &[format!("[{}/{}] `{}` Action... ", cntr, total, action.title)])?;
     }
     stdout().flush()?;
     let now = Instant::now();
@@ -220,10 +230,14 @@ fn execute_pipeline(
       
       if !env.no_pipe {
         println!("{} ({}).", status_str, format!("{:.2?}", elapsed).green());
+        build_log(&log_file, &output)?;
         for line in output { println!("{}", line); }
       } else {
         println!("[{}/{}] `{}` Action - {} ({}).", cntr, total, action.title.blue().italic(), status_str, format!("{:.2?}", elapsed).green());
       }
+      build_log(&log_file, &[
+        format!("[{}/{}] `{}` Action - {} ({:.2?}).", cntr, total, action.title, if status { "done" } else { "got an error!" }, elapsed),
+      ])?;
     }
     
     cntr += 1;
@@ -236,7 +250,7 @@ fn execute_pipeline(
 
 pub(crate) fn clean_builds(
   config: &mut DeployerProjectOptions,
-  cache_dir: &str,
+  cache_dir: &Path,
   args: &CleanArgs,
 ) -> anyhow::Result<()> {
   let mut path = PathBuf::new();

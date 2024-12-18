@@ -3,9 +3,10 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::sync::OnceLock;
 use std::path::{Path, PathBuf};
-use crate::PROJECT_CONF;
+use crate::{CACHE_DIR, LOGS_DIR, PROJECT_CONF};
 
 pub(crate) static VERBOSE: OnceLock<bool> = OnceLock::new();
+const LOG_FILE_DELIMETER: &str = "================================================================";
 
 pub(crate) fn read<T: DeserializeOwned + Default>(folder: impl AsRef<Path>, file: impl AsRef<Path>) -> T {
   let mut path = PathBuf::new();
@@ -52,7 +53,6 @@ pub(crate) fn write<T: Serialize>(folder: impl AsRef<Path>, file: impl AsRef<Pat
     },
   }
 }
-
 
 pub(crate) fn copy_all(src: impl AsRef<Path>, dst: impl AsRef<Path>, ignore: &[&str]) -> anyhow::Result<()> {
   if src.as_ref().is_file() {
@@ -115,4 +115,42 @@ pub(crate) fn log(s: impl AsRef<str>) {
   if *VERBOSE.wait() {
     println!("{}", s.as_ref());
   }
+}
+
+pub(crate) fn generate_build_log_filepath(
+  project_name: &str,
+  pipeline_short_name: &str,
+  cache_dir: &Path,
+) -> PathBuf {
+  use chrono::Utc;
+  
+  let mut logs_path = PathBuf::new();
+  logs_path.push(cache_dir);
+  logs_path.push(CACHE_DIR);
+  logs_path.push(LOGS_DIR);
+  if !logs_path.exists() { std::fs::create_dir_all(logs_path.as_path()).unwrap_or_else(|_| panic!("Can't create `{:?}` folder!", logs_path)); }
+  
+  let curr_dt = Utc::now();
+  
+  let log_path = logs_path.join(format!("{}-{}-{}.txt", project_name, pipeline_short_name, curr_dt.format("%Y-%m-%d-%H:%M")));
+  if log_path.exists() { build_log(&log_path, &[LOG_FILE_DELIMETER.to_string()]).expect("Current log file is unwriteable!"); }
+  
+  log_path
+}
+
+pub(crate) fn build_log(
+  path: &Path,
+  output: &[String],
+) -> anyhow::Result<()> {
+  use std::io::Write;
+  
+  let file = File::options().create(true).append(true).open(path)?;
+  let mut writer = BufWriter::new(file);
+  for line in output {
+    let line = strip_ansi_escapes::strip(line.as_bytes());
+    writer.write_all(&line)?;
+    writer.write_all("\n".as_bytes())?;
+  }
+  
+  Ok(())
 }
