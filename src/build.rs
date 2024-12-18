@@ -2,7 +2,7 @@ use colored::Colorize;
 use std::path::PathBuf;
 use uuid::Uuid;
 
-use crate::{DEPLOY_CACHE_SUBDIR, DEPLOY_ARTIFACTS_SUBDIR, DEPLOY_CONF_FILE};
+use crate::{CACHE_DIR, ARTIFACTS_DIR, PROJECT_CONF};
 use crate::actions::*;
 use crate::entities::{
   traits::Execute,
@@ -19,7 +19,7 @@ fn enplace_artifacts(
   env: BuildEnvironment,
   panic_when_not_found: bool,
 ) -> anyhow::Result<()> {
-  let mut ignore = vec![DEPLOY_ARTIFACTS_SUBDIR];
+  let mut ignore = vec![ARTIFACTS_DIR];
   ignore.extend_from_slice(&(config.cache_files.iter().map(|c| c.as_str()).collect::<Vec<_>>()));
   
   for (from, to) in &config.inplace_artifacts_into_project_root {
@@ -37,7 +37,7 @@ fn enplace_artifacts(
 pub(crate) fn prepare_artifacts_folder(
   current_dir: &std::path::Path,
 ) -> anyhow::Result<PathBuf> {
-  let artifacts_dir = current_dir.join(DEPLOY_ARTIFACTS_SUBDIR);
+  let artifacts_dir = current_dir.join(ARTIFACTS_DIR);
   std::fs::create_dir_all(artifacts_dir.as_path()).unwrap_or_else(|_| panic!("Can't create `{:?}` folder!", artifacts_dir));
   
   Ok(artifacts_dir)
@@ -54,7 +54,7 @@ pub(crate) fn prepare_build_folder(
 ) -> anyhow::Result<PathBuf> {
   let mut build_path = PathBuf::new();
   build_path.push(cache_dir);
-  build_path.push(DEPLOY_CACHE_SUBDIR);
+  build_path.push(CACHE_DIR);
   if !build_path.exists() { *new_build = true; }
   std::fs::create_dir_all(build_path.as_path()).unwrap_or_else(|_| panic!("Can't create `{:?}` folder!", build_path));
   
@@ -74,11 +74,11 @@ pub(crate) fn prepare_build_folder(
   
   build_path.push(uuid.clone());
   
-  let mut ignore = vec![DEPLOY_ARTIFACTS_SUBDIR, &uuid];
+  let mut ignore = vec![ARTIFACTS_DIR, &uuid];
   ignore.extend_from_slice(&config.cache_files.iter().map(|v| v.as_str()).collect::<Vec<_>>());
   
   copy_all(get_current_working_dir().unwrap(), build_path.as_path(), &ignore)?;
-  write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
+  write(get_current_working_dir().unwrap(), PROJECT_CONF, &config);
   
   if link_cache {
     for cache_item in &config.cache_files {
@@ -201,7 +201,7 @@ fn execute_pipeline(
         enplace_artifacts(config, env, false)?;
         
         let mut modified_env = env;
-        let artifacts_dir = modified_env.build_dir.to_path_buf().join(DEPLOY_ARTIFACTS_SUBDIR);
+        let artifacts_dir = modified_env.build_dir.to_path_buf().join(ARTIFACTS_DIR);
         modified_env.artifacts_dir = &artifacts_dir;
         enplace_artifacts(config, modified_env, false)?;
         
@@ -246,7 +246,7 @@ pub(crate) fn clean_builds(
 ) -> anyhow::Result<()> {
   let mut path = PathBuf::new();
   path.push(cache_dir);
-  path.push(DEPLOY_CACHE_SUBDIR);
+  path.push(CACHE_DIR);
   
   config.last_build = None;
   for build in &config.builds {
@@ -258,7 +258,7 @@ pub(crate) fn clean_builds(
   
   if args.include_artifacts {
     let curr_dir = std::env::current_dir()?;
-    let artifacts_dir = curr_dir.join(DEPLOY_ARTIFACTS_SUBDIR);
+    let artifacts_dir = curr_dir.join(ARTIFACTS_DIR);
     if artifacts_dir.as_path().exists() {
       let _ = std::fs::remove_dir_all(artifacts_dir);
     }

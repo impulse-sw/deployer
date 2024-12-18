@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::sync::OnceLock;
 use std::path::{Path, PathBuf};
-use crate::DEPLOY_CONF_FILE;
+use crate::PROJECT_CONF;
 
 pub(crate) static VERBOSE: OnceLock<bool> = OnceLock::new();
 
@@ -77,10 +77,8 @@ pub(crate) fn copy_all(src: impl AsRef<Path>, dst: impl AsRef<Path>, ignore: &[&
     let d = dst.as_ref().join(entry.file_name());
     if ty.is_dir() {
       copy_all(entry.path(), d, ignore)?;
-    } else if name == DEPLOY_CONF_FILE {
-      
+    } else if name == PROJECT_CONF {
       log(format!("Symlinking `{}` from {:?} to {:?}", name, entry.path(), d));
-      
       symlink(std::fs::canonicalize(entry.path())?, d);
     } else if ty.is_file() {
       std::fs::copy(entry.path(), d)?;
