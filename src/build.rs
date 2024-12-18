@@ -34,35 +34,33 @@ fn enplace_artifacts(
   Ok(())
 }
 
-pub(crate) fn build(
+pub(crate) fn prepare_artifacts_folder(
+  current_dir: &std::path::Path,
+) -> anyhow::Result<PathBuf> {
+  let artifacts_dir = current_dir.join(DEPLOY_ARTIFACTS_SUBDIR);
+  std::fs::create_dir_all(artifacts_dir.as_path()).unwrap_or_else(|_| panic!("Can't create `{:?}` folder!", artifacts_dir));
+  
+  Ok(artifacts_dir)
+}
+
+pub(crate) fn prepare_build_folder(
   config: &mut DeployerProjectOptions,
+  current_dir: &std::path::Path,
   cache_dir: &str,
-  args: &mut BuildArgs,
-) -> anyhow::Result<()> {
-  if *config == Default::default() { panic!("Config is invalid!"); }
-  
-  let mut new_build = false;
-  
-  if
-    let Some(pipeline_tag) = &args.pipeline_tag &&
-    !config.pipelines.iter().any(|p| p.title.as_str() == pipeline_tag.as_str())
-  {
-    panic!("There is no such Pipeline set up for this project. Maybe, you've forgotten `deployer with {{pipeline-short-name-and-ver}}`?");
-  }
-  
+  mut fresh: bool,
+  link_cache: bool,
+  copy_cache: bool,
+  new_build: &mut bool,
+) -> anyhow::Result<PathBuf> {
   let mut build_path = PathBuf::new();
   build_path.push(cache_dir);
   build_path.push(DEPLOY_CACHE_SUBDIR);
-  if !build_path.exists() { new_build = true; }
+  if !build_path.exists() { *new_build = true; }
   std::fs::create_dir_all(build_path.as_path()).unwrap_or_else(|_| panic!("Can't create `{:?}` folder!", build_path));
   
-  let curr_dir = std::env::current_dir().expect("Can't get current dir!");
-  let artifacts_dir = curr_dir.join(DEPLOY_ARTIFACTS_SUBDIR);
-  std::fs::create_dir_all(artifacts_dir.as_path()).unwrap_or_else(|_| panic!("Can't create `{:?}` folder!", build_path));
+  if config.last_build.is_none() { fresh = true; }
   
-  if config.last_build.is_none() { args.fresh = true; }
-  
-  let uuid = match args.fresh {
+  let uuid = match fresh {
     true => {
       let uuid = format!("deploy-build-{}", Uuid::new_v4());
       config.builds.push(uuid.clone());
@@ -82,32 +80,65 @@ pub(crate) fn build(
   copy_all(get_current_working_dir().unwrap(), build_path.as_path(), &ignore)?;
   write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
   
-  if args.with_cache {
-    match args.copy_cache {
-      false => {
-        for cache_item in &config.cache_files {
-          symlink(curr_dir.join(cache_item.as_str()), build_path.join(cache_item.as_str()));
-          log(format!("-> {}", cache_item.as_str()));
-        }
-      },
-      true => {
-        for cache_item in &config.cache_files {
-          copy_all(
-            curr_dir.join(cache_item.as_str()),
-            build_path.join(cache_item.as_str()),
-            &[]
-          )?;
-          log(format!("-> {}", cache_item.as_str()));
-        }
-      },
+  if link_cache {
+    for cache_item in &config.cache_files {
+      symlink(current_dir.join(cache_item.as_str()), build_path.join(cache_item.as_str()));
+      log(format!("-> {}", cache_item.as_str()));
     }
   }
+  
+  if copy_cache {
+    for cache_item in &config.cache_files {
+      copy_all(
+        current_dir.join(cache_item.as_str()),
+        build_path.join(cache_item.as_str()),
+        &[]
+      )?;
+      log(format!("-> {}", cache_item.as_str()));
+    }
+  }
+  
+  Ok(build_path)
+}
+
+pub(crate) fn build(
+  config: &mut DeployerProjectOptions,
+  cache_dir: &str,
+  args: &mut BuildArgs,
+) -> anyhow::Result<()> {
+  if *config == Default::default() { panic!("Config is invalid!"); }
+  
+  if args.link_cache && args.copy_cache { panic!(
+    "Select only one option from `{}` and `{}`. See help via `{}`.", "c".green(), "C".green(), "deployer build -h".green()
+  ); }
+  if (args.fresh || args.link_cache || args.copy_cache) && args.current { panic!(
+    "Select either `{}` or `{}`/`{}`/`{}` options. See help via `{}`.", "j".green(), "f".green(), "c".green(), "C".green(), "deployer build -h".green()
+  ); }
+  if args.silent && args.no_pipe { panic!(
+    "Select only one option from `{}` and `{}`. See help via `{}`.", "s".green(), "t".green(), "deployer build -h".green()
+  ); }
+  
+  let mut new_build = false;
+  
+  if
+    let Some(pipeline_tag) = &args.pipeline_tag &&
+    !config.pipelines.iter().any(|p| p.title.as_str() == pipeline_tag.as_str())
+  {
+    panic!("There is no such Pipeline set up for this project. Maybe, you've forgotten `deployer with {{pipeline-short-name-and-ver}}`?");
+  }
+  
+  let curr_dir = std::env::current_dir().expect("Can't get current dir!");
+  let artifacts_dir = prepare_artifacts_folder(&curr_dir)?;
+  let build_path = if args.current { curr_dir } else {
+    prepare_build_folder(config, &curr_dir, cache_dir, args.fresh, args.link_cache, args.copy_cache, &mut new_build)?
+  };
   
   let env = BuildEnvironment {
     build_dir: &build_path,
     artifacts_dir: &artifacts_dir,
     new_build,
     silent_build: args.silent,
+    no_pipe: args.no_pipe,
   };
   
   if
@@ -131,7 +162,7 @@ pub(crate) fn build(
   
   enplace_artifacts(config, env, true)?;
   
-  println!("Build path: {}", build_path.to_str().expect("Can't convert `Path` to string!"));
+  if !args.silent { println!("Build path: {}", build_path.to_str().expect("Can't convert `Path` to string!")); }
   
   Ok(())
 }
@@ -144,11 +175,17 @@ fn execute_pipeline(
   use std::io::{stdout, Write};
   use std::time::Instant;
   
-  println!("Starting the `{}` Pipeline...", pipeline.title);
+  if !env.silent_build { println!("Starting the `{}` Pipeline...", pipeline.title); }
   let mut cntr = 1usize;
   let total = pipeline.actions.len();
   for action in &pipeline.actions {
-    print!("[{}/{}] `{}` Action... ", cntr, total, action.title.blue().italic());
+    if !env.silent_build {
+      if !env.no_pipe {
+        print!("[{}/{}] `{}` Action... ", cntr, total, action.title.blue().italic());
+      } else {
+        println!("[{}/{}] `{}` Action... ", cntr, total, action.title.blue().italic());
+      }
+    }
     stdout().flush()?;
     let now = Instant::now();
     
@@ -183,17 +220,20 @@ fn execute_pipeline(
       false => "got an error!".red().bold().to_string(),
     };
     
-    let elapsed = now.elapsed();
-    println!("{} ({}).", status_str, format!("{:.2?}", elapsed).green());
+    if !env.silent_build {
+      let elapsed = now.elapsed();
+      
+      if !env.no_pipe {
+        println!("{} ({}).", status_str, format!("{:.2?}", elapsed).green());
+        for line in output { println!("{}", line); }
+      } else {
+        println!("[{}/{}] `{}` Action - {} ({}).", cntr, total, action.title.blue().italic(), status_str, format!("{:.2?}", elapsed).green());
+      }
+    }
+    
     cntr += 1;
     
-    if !env.silent_build {
-      for line in output { println!("{}", line); }
-    }
-    
-    if !status {
-      return Ok(())
-    }
+    if !status { return Ok(()) }
   }
   
   Ok(())

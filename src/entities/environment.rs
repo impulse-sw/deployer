@@ -6,4 +6,5 @@ pub(crate) struct BuildEnvironment<'a> {
   pub(crate) artifacts_dir: &'a Path,
   pub(crate) new_build: bool,
   pub(crate) silent_build: bool,
+  pub(crate) no_pipe: bool,
 }
