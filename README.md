@@ -3,7 +3,7 @@
 Deployer is a relative simple, yet powerful localhost CI/CD instrument. It allows you to:
 
 - have your own actions and pipelines repositories (`Actions Registry` and `Pipelines Registry`) in a single JSON file
-- create actions and pipelines from TUI or JSON\ configuration files
+- create actions and pipelines from TUI or JSON configuration files
 - configure actions for specific project
 - check compatibility over actions and projects
 - and share your project build/deploy settings very quickly and without any dependencies.
@@ -296,8 +296,14 @@ deployer build
 
 # see the build options: you can share cache files and folders by symlinking or copying
 deployer build --help
-deployer build -fw
+deployer build -fc
 
 # or explicitly specify the project pipeline's short name - `build-and-compress`
 deployer build build-and-compress
+```
+
+For other options, check:
+
+```bash
+deployer build -h
 ```
