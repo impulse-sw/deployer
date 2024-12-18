@@ -414,5 +414,14 @@ fn compose_output(
     }
   }
   
-  output
+  if
+    let Ok(num) = std::env::var("DEPLOYER_TRIM_ERR_OUT_LINES") &&
+    let Ok(num) = num.parse::<usize>() &&
+    num <= output.len() &&
+    !success
+  {
+    output[(output.len()-1-num)..(output.len()-1)].to_vec()
+  } else {
+    output
+  }
 }
