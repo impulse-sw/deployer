@@ -2,17 +2,20 @@ use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::process::exit;
 
-use crate::actions::{DescribedAction, new_action};
+use crate::actions::{DescribedAction, Action, new_action};
+use crate::build::enplace_artifacts;
 use crate::cmd::{NewActionArgs, NewPipelineArgs, CatPipelineArgs, WithPipelineArgs};
 use crate::configs::{DeployerGlobalConfig, DeployerProjectOptions};
 use crate::entities::{
+  environment::BuildEnvironment,
   info::{PipelineInfo, info2str_simple, info2str, str2info},
   targets::TargetDescription,
-  traits::EditExtended,
+  traits::{EditExtended, Execute},
 };
 use crate::hmap;
-use crate::rw::read_checked;
+use crate::rw::{read_checked, generate_build_log_filepath, build_log};
 use crate::utils::tags_custom_type;
+use crate::ARTIFACTS_DIR;
 
 #[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub(crate) struct DescribedPipeline {
@@ -538,4 +541,89 @@ impl EditExtended<DeployerGlobalConfig> for Vec<DescribedPipeline> {
     
     Ok(())
   }
+}
+
+pub(crate) fn execute_pipeline(
+  config: &DeployerProjectOptions,
+  env: BuildEnvironment,
+  pipeline: &DescribedPipeline,
+) -> anyhow::Result<()> {
+  use std::io::{stdout, Write};
+  use std::time::Instant;
+  
+  let log_file = generate_build_log_filepath(
+    &config.project_name,
+    &pipeline.title,
+    env.cache_dir,
+  );
+  
+  if !env.silent_build { println!("Starting the `{}` Pipeline...", pipeline.title); }
+  build_log(&log_file, &[format!("Starting the `{}` Pipeline...", pipeline.title)])?;
+  
+  let mut cntr = 1usize;
+  let total = pipeline.actions.len();
+  for action in &pipeline.actions {
+    if !env.silent_build {
+      if !env.no_pipe {
+        print!("[{}/{}] `{}` Action... ", cntr, total, action.title.blue().italic());
+      } else {
+        println!("[{}/{}] `{}` Action... ", cntr, total, action.title.blue().italic());
+      }
+      build_log(&log_file, &[format!("[{}/{}] `{}` Action... ", cntr, total, action.title)])?;
+    }
+    stdout().flush()?;
+    let now = Instant::now();
+    
+    let (status, output) = match &action.action {
+      Action::Custom(cmd) => cmd.execute(env)?,
+      Action::Check(check) => check.execute(env)?,
+      Action::PreBuild(a) | Action::Build(a) | Action::PostBuild(a) | Action::Test(a) => a.execute(env)?,
+      Action::ProjectClean(pc_action) => pc_action.execute(env)?,
+      Action::Pack(a) | Action::Deliver(a) | Action::Install(a) => a.execute(env)?,
+      Action::ConfigureDeploy(a) | Action::Deploy(a) | Action::PostDeploy(a) => a.execute(env)?,
+      Action::Observe(o_action) => o_action.execute(env)?,
+      Action::ForceArtifactsEnplace => {
+        enplace_artifacts(config, env, false)?;
+        
+        let mut modified_env = env;
+        let artifacts_dir = modified_env.build_dir.to_path_buf().join(ARTIFACTS_DIR);
+        modified_env.artifacts_dir = &artifacts_dir;
+        enplace_artifacts(config, modified_env, false)?;
+        
+        (true, vec!["Artifacts are enplaced successfully.".into()])
+      },
+      Action::Interrupt => {
+        println!();
+        inquire::Confirm::new("The Pipeline is interrupted. Click `Enter` to continue").with_default(true).prompt()?;
+        (true, vec![])
+      },
+      
+    };
+    
+    let status_str = match status {
+      true => "done".to_string(),
+      false => "got an error!".red().bold().to_string(),
+    };
+    
+    let elapsed = now.elapsed();
+    if !env.no_pipe { build_log(&log_file, &output)?; }
+    build_log(&log_file, &[
+      format!("[{}/{}] `{}` Action - {} ({:.2?}).", cntr, total, action.title, if status { "done" } else { "got an error!" }, elapsed),
+    ])?;
+    
+    if !env.silent_build {
+      if !env.no_pipe {
+        println!("{} ({}).", status_str, format!("{:.2?}", elapsed).green());
+        for line in output { println!("{}", line); }
+      } else {
+        println!("[{}/{}] `{}` Action - {} ({}).", cntr, total, action.title.blue().italic(), status_str, format!("{:.2?}", elapsed).green());
+      }
+    }
+    
+    cntr += 1;
+    
+    if !status { return Ok(()) }
+  }
+  
+  Ok(())
 }

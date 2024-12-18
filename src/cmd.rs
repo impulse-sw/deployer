@@ -1,4 +1,5 @@
 use clap::{Args, Subcommand, Parser};
+use std::path::PathBuf;
 
 /// Build and deploy your services as fast as you can.
 #[derive(Parser, Debug)]
@@ -145,6 +146,9 @@ pub(crate) struct BuildArgs {
   /// Build in current folder
   #[arg(short('j'), long)]
   pub(crate) current: bool,
+  /// Build in specified folder
+  #[arg(short('o'), long)]
+  pub(crate) build_at: Option<PathBuf>,
   
   /// Fresh build
   #[arg(short('f'), long)]

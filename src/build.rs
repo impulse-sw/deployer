@@ -3,18 +3,14 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 use crate::{CACHE_DIR, ARTIFACTS_DIR, PROJECT_CONF};
-use crate::actions::*;
-use crate::entities::{
-  traits::Execute,
-  environment::BuildEnvironment,
-};
+use crate::entities::environment::BuildEnvironment;
 use crate::cmd::{BuildArgs, CleanArgs};
 use crate::configs::DeployerProjectOptions;
-use crate::pipelines::DescribedPipeline;
-use crate::rw::{copy_all, write, symlink, log, generate_build_log_filepath, build_log};
+use crate::pipelines::execute_pipeline;
+use crate::rw::{copy_all, write, symlink, log};
 use crate::utils::get_current_working_dir;
 
-fn enplace_artifacts(
+pub(crate) fn enplace_artifacts(
   config: &DeployerProjectOptions,
   env: BuildEnvironment,
   panic_when_not_found: bool,
@@ -47,47 +43,52 @@ fn prepare_build_folder(
   config: &mut DeployerProjectOptions,
   current_dir: &std::path::Path,
   cache_dir: &Path,
-  mut fresh: bool,
-  link_cache: bool,
-  copy_cache: bool,
-  new_build: &mut bool,
-) -> anyhow::Result<PathBuf> {
-  let mut build_path = PathBuf::new();
-  build_path.push(cache_dir);
-  build_path.push(CACHE_DIR);
-  if !build_path.exists() { *new_build = true; }
-  std::fs::create_dir_all(build_path.as_path()).unwrap_or_else(|_| panic!("Can't create `{:?}` folder!", build_path));
+  args: &BuildArgs,
+) -> anyhow::Result<(PathBuf, bool)> {
+  let mut fresh = args.fresh;
   
-  if config.last_build.is_none() { fresh = true; }
+  let build_path = if let Some(build_at) = args.build_at.as_ref() {
+    build_at.to_owned()
+  } else {
+    let mut build_path = PathBuf::new();
+    build_path.push(cache_dir);
+    build_path.push(CACHE_DIR);
+    
+    if config.last_build.is_none() { fresh = true; }
   
-  let uuid = match fresh {
-    true => {
-      let uuid = format!("deploy-build-{}", Uuid::new_v4());
-      config.builds.push(uuid.clone());
-      config.last_build = Some(uuid.clone());
-      uuid
-    },
-    false => {
-      config.last_build.as_ref().unwrap().to_owned()
-    },
+    let uuid = match fresh {
+      true => {
+        let uuid = format!("deploy-build-{}", Uuid::new_v4());
+        config.builds.push(uuid.clone());
+        config.last_build = Some(uuid.clone());
+        uuid
+      },
+      false => {
+        config.last_build.as_ref().unwrap().to_owned()
+      },
+    };
+    
+    build_path.push(uuid.clone());
+    build_path
   };
   
-  build_path.push(uuid.clone());
+  if !build_path.exists() { fresh = true; }
+  std::fs::create_dir_all(build_path.as_path()).unwrap_or_else(|_| panic!("Can't create `{:?}` folder!", build_path));
   
-  let mut ignore = vec![ARTIFACTS_DIR, &uuid];
+  let mut ignore = vec![ARTIFACTS_DIR, build_path.file_name().unwrap().to_str().unwrap()];
   ignore.extend_from_slice(&config.cache_files.iter().map(|v| v.as_str()).collect::<Vec<_>>());
   
   copy_all(get_current_working_dir().unwrap(), build_path.as_path(), &ignore)?;
   write(get_current_working_dir().unwrap(), PROJECT_CONF, &config);
   
-  if link_cache {
+  if args.link_cache {
     for cache_item in &config.cache_files {
       symlink(current_dir.join(cache_item.as_str()), build_path.join(cache_item.as_str()));
       log(format!("-> {}", cache_item.as_str()));
     }
   }
   
-  if copy_cache {
+  if args.copy_cache {
     for cache_item in &config.cache_files {
       copy_all(
         current_dir.join(cache_item.as_str()),
@@ -98,7 +99,7 @@ fn prepare_build_folder(
     }
   }
   
-  Ok(build_path)
+  Ok((build_path, fresh))
 }
 
 pub(crate) fn build(
@@ -111,20 +112,22 @@ pub(crate) fn build(
   if args.link_cache && args.copy_cache { panic!(
     "Select only one option from `{}` and `{}`. See help via `{}`.", "c".green(), "C".green(), "deployer build -h".green()
   ); }
-  if (args.fresh || args.link_cache || args.copy_cache) && args.current { panic!(
-    "Select either `{}` or `{}`/`{}`/`{}` options. See help via `{}`.", "j".green(), "f".green(), "c".green(), "C".green(), "deployer build -h".green()
+  if (args.fresh || args.link_cache || args.copy_cache || args.build_at.is_some()) && args.current { panic!(
+    "Select either `{}` or `{}`/{}`/`{}`/`{}` options. See help via `{}`.",
+    "o".green(),
+    "j".green(),
+    "f".green(),
+    "c".green(),
+    "C".green(),
+    "deployer build -h".green(),
   ); }
   if args.silent && args.no_pipe { panic!(
     "Select only one option from `{}` and `{}`. See help via `{}`.", "s".green(), "t".green(), "deployer build -h".green()
   ); }
   
-  let mut new_build = false;
-  
   let curr_dir = std::env::current_dir().expect("Can't get current dir!");
   let artifacts_dir = prepare_artifacts_folder(&curr_dir)?;
-  let build_path = if args.current { curr_dir } else {
-    prepare_build_folder(config, &curr_dir, cache_dir, args.fresh, args.link_cache, args.copy_cache, &mut new_build)?
-  };
+  let (build_path, new_build) = if args.current { (curr_dir, false) } else { prepare_build_folder(config, &curr_dir, cache_dir, args)? };
   
   let env = BuildEnvironment {
     build_dir: &build_path,
@@ -158,92 +161,7 @@ pub(crate) fn build(
   
   enplace_artifacts(config, env, true)?;
   
-  if !args.silent { println!("Build path: {}", build_path.to_str().expect("Can't convert `Path` to string!")); }
-  
-  Ok(())
-}
-
-fn execute_pipeline(
-  config: &DeployerProjectOptions,
-  env: BuildEnvironment,
-  pipeline: &DescribedPipeline,
-) -> anyhow::Result<()> {
-  use std::io::{stdout, Write};
-  use std::time::Instant;
-  
-  let log_file = generate_build_log_filepath(
-    &config.project_name,
-    &pipeline.title,
-    env.cache_dir,
-  );
-  
-  if !env.silent_build { println!("Starting the `{}` Pipeline...", pipeline.title); }
-  build_log(&log_file, &[format!("Starting the `{}` Pipeline...", pipeline.title)])?;
-  
-  let mut cntr = 1usize;
-  let total = pipeline.actions.len();
-  for action in &pipeline.actions {
-    if !env.silent_build {
-      if !env.no_pipe {
-        print!("[{}/{}] `{}` Action... ", cntr, total, action.title.blue().italic());
-      } else {
-        println!("[{}/{}] `{}` Action... ", cntr, total, action.title.blue().italic());
-      }
-      build_log(&log_file, &[format!("[{}/{}] `{}` Action... ", cntr, total, action.title)])?;
-    }
-    stdout().flush()?;
-    let now = Instant::now();
-    
-    let (status, output) = match &action.action {
-      Action::Custom(cmd) => cmd.execute(env)?,
-      Action::Check(check) => check.execute(env)?,
-      Action::PreBuild(a) | Action::Build(a) | Action::PostBuild(a) | Action::Test(a) => a.execute(env)?,
-      Action::ProjectClean(pc_action) => pc_action.execute(env)?,
-      Action::Pack(a) | Action::Deliver(a) | Action::Install(a) => a.execute(env)?,
-      Action::ConfigureDeploy(a) | Action::Deploy(a) | Action::PostDeploy(a) => a.execute(env)?,
-      Action::Observe(o_action) => o_action.execute(env)?,
-      Action::ForceArtifactsEnplace => {
-        enplace_artifacts(config, env, false)?;
-        
-        let mut modified_env = env;
-        let artifacts_dir = modified_env.build_dir.to_path_buf().join(ARTIFACTS_DIR);
-        modified_env.artifacts_dir = &artifacts_dir;
-        enplace_artifacts(config, modified_env, false)?;
-        
-        (true, vec!["Artifacts are enplaced successfully.".into()])
-      },
-      Action::Interrupt => {
-        println!();
-        inquire::Confirm::new("The Pipeline is interrupted. Click `Enter` to continue").with_default(true).prompt()?;
-        (true, vec![])
-      },
-      
-    };
-    
-    let status_str = match status {
-      true => "done".to_string(),
-      false => "got an error!".red().bold().to_string(),
-    };
-    
-    if !env.silent_build {
-      let elapsed = now.elapsed();
-      
-      if !env.no_pipe {
-        println!("{} ({}).", status_str, format!("{:.2?}", elapsed).green());
-        build_log(&log_file, &output)?;
-        for line in output { println!("{}", line); }
-      } else {
-        println!("[{}/{}] `{}` Action - {} ({}).", cntr, total, action.title.blue().italic(), status_str, format!("{:.2?}", elapsed).green());
-      }
-      build_log(&log_file, &[
-        format!("[{}/{}] `{}` Action - {} ({:.2?}).", cntr, total, action.title, if status { "done" } else { "got an error!" }, elapsed),
-      ])?;
-    }
-    
-    cntr += 1;
-    
-    if !status { return Ok(()) }
-  }
+  if !args.silent { println!("Build path: {}", build_path.canonicalize()?.to_str().expect("Can't convert `Path` to string!")); }
   
   Ok(())
 }
