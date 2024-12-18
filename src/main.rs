@@ -139,7 +139,7 @@ fn main() {
       write(&config_folder, GLOBAL_CONF, &globals);
       write(get_current_working_dir().unwrap(), PROJECT_CONF, &config);
     },
-    DeployerExecType::Build(mut args) => build(&mut config, &cache_folder, &mut args).unwrap(),
+    DeployerExecType::Build(args) => build(&mut config, &cache_folder, &args).unwrap(),
     DeployerExecType::Clean(args) => {
       clean_builds(&mut config, &cache_folder, &args).unwrap();
       write(get_current_working_dir().unwrap(), PROJECT_CONF, &config);

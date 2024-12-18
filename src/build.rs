@@ -104,7 +104,7 @@ pub(crate) fn prepare_build_folder(
 pub(crate) fn build(
   config: &mut DeployerProjectOptions,
   cache_dir: &str,
-  args: &mut BuildArgs,
+  args: &BuildArgs,
 ) -> anyhow::Result<()> {
   if *config == Default::default() { panic!("Config is invalid!"); }
   
