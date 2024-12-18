@@ -64,7 +64,8 @@ fn main() {
   let args = Cli::parse();
   
   if args.verbose {
-    VERBOSE.set(true).unwrap();
+    if let DeployerExecType::Build(build_args) = &args.r#type && build_args.silent { VERBOSE.set(false).unwrap(); }
+    else { VERBOSE.set(true).unwrap(); }
   } else {
     VERBOSE.set(false).unwrap();
   }
