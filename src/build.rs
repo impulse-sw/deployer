@@ -120,13 +120,6 @@ pub(crate) fn build(
   
   let mut new_build = false;
   
-  if
-    let Some(pipeline_tag) = &args.pipeline_tag &&
-    !config.pipelines.iter().any(|p| p.title.as_str() == pipeline_tag.as_str())
-  {
-    panic!("There is no such Pipeline set up for this project. Maybe, you've forgotten `deployer with {{pipeline-short-name-and-ver}}`?");
-  }
-  
   let curr_dir = std::env::current_dir().expect("Can't get current dir!");
   let artifacts_dir = prepare_artifacts_folder(&curr_dir)?;
   let build_path = if args.current { curr_dir } else {
@@ -141,21 +134,23 @@ pub(crate) fn build(
     no_pipe: args.no_pipe,
   };
   
-  if
-    let Some(pipeline_tag) = &args.pipeline_tag &&
-    let Some(pipeline) = config.pipelines.iter().find(|p| p.title.as_str() == pipeline_tag)
-  {
-    execute_pipeline(config, env, pipeline)?;
-  } else {
+  if args.pipeline_tags.is_empty() {
     if config.pipelines.is_empty() {
-      anyhow::bail!("The pipelines' list is empty! Check the config file for errors.")
+      panic!("The pipelines' list is empty! Check the config file for errors.");
     }
-    
     if let Some(pipeline) = &config.pipelines.iter().find(|p| p.default.is_some_and(|v| v)) {
       execute_pipeline(config, env, pipeline)?;
-    } else {
-      for pipeline in &config.pipelines {
+    }
+  } else {
+    for pipeline_tag in &args.pipeline_tags {
+      if let Some(pipeline) = config.pipelines.iter().find(|p| p.title.as_str().eq(pipeline_tag)) {
         execute_pipeline(config, env, pipeline)?;
+      } else {
+        panic!(
+          "There is no such Pipeline `{}` set up for this project. Maybe, you've forgotten set up this Pipeline for project via `{}`?",
+          pipeline_tag.green(),
+          "deployer with {pipeline-short-name-and-ver}".green(),
+        );
       }
     }
   }
