@@ -325,6 +325,8 @@ pub(crate) fn assign_pipeline_to_project(
       .ok_or_else(|| anyhow::anyhow!("There is no such Pipeline in Registry. See available Pipelines with `deployer ls pipelines`."))?
       .clone()
   } else if !globals.pipelines_registry.is_empty() {
+    const NEW_PIPELINE: &str = "· Specify another Pipeline";
+    
     let mut ptags = hmap!();
     let mut tags = vec![];
     
@@ -333,13 +335,18 @@ pub(crate) fn assign_pipeline_to_project(
       .iter()
       .map(|(k, v)| (format!("`{}` - {}", k.blue().bold(), v.title.green().bold()), v))
       .for_each(|(t, p)| { tags.push(t.clone()); ptags.insert(t, p); });
+    tags.push(NEW_PIPELINE.to_string());
     
     let selected = inquire::Select::new("Select the Pipeline for this project:", tags).prompt()?;
-    let pipeline = ptags
-      .get(&selected)
-      .ok_or(anyhow::anyhow!("There is no such Pipeline in Registry. See available Pipelines with `deployer ls pipelines`."))?;
     
-    (*pipeline).clone()
+    if selected.as_str() == NEW_PIPELINE {
+      DescribedPipeline::new_from_prompt(globals)?
+    } else {
+      let pipeline = ptags
+        .get(&selected)
+        .ok_or(anyhow::anyhow!("There is no such Pipeline in Registry. See available Pipelines with `deployer ls pipelines`."))?;
+      (*pipeline).clone()
+    }
   } else {
     DescribedPipeline::new_from_prompt(globals)?
   };
