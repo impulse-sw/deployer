@@ -140,16 +140,25 @@ pub(crate) struct CleanArgs {
 pub(crate) struct BuildArgs {
   /// {short-name}
   pub(crate) pipeline_tag: Option<String>,
+  
+  /// Build in current folder
+  #[arg(short('j'), long)]
+  pub(crate) current: bool,
+  
   /// Fresh build
-  #[arg(short, long)]
+  #[arg(short('f'), long)]
   pub(crate) fresh: bool,
-  /// With cache
-  #[arg(short, long)]
-  pub(crate) with_cache: bool,
-  /// With cache too, but copy cache files and folders instead of symlinking
-  #[arg(long)]
+  /// With symlinking cache
+  #[arg(short('c'), long)]
+  pub(crate) link_cache: bool,
+  /// With copying cache
+  #[arg(short('C'), long)]
   pub(crate) copy_cache: bool,
-  /// Disable output from Actions
-  #[arg(short, long)]
+  
+  /// Force disable output from Actions
+  #[arg(short('s'), long)]
   pub(crate) silent: bool,
+  /// Don't pipe I/O channels
+  #[arg(short('t'), long)]
+  pub(crate) no_pipe: bool,
 }

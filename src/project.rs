@@ -260,9 +260,11 @@ impl Edit for Vec<TargetDescription> {
 
 fn collect_targets() -> anyhow::Result<Vec<TargetDescription>> {
   let mut v = vec![];
+  let mut first = true;
   
-  while inquire::Confirm::new("Add new build target?").with_default(false).prompt()? {
+  while inquire::Confirm::new("Add new build target?").with_default(first).prompt()? {
     v.push(TargetDescription::new_from_prompt()?);
+    first = false;
   }
   
   Ok(v)
@@ -274,9 +276,11 @@ fn collect_artifact() -> anyhow::Result<String> {
 
 fn collect_artifacts() -> anyhow::Result<Vec<String>> {
   let mut v = vec![];
+  let mut first = true;
   
-  while inquire::Confirm::new("Add new build/deploy artifact?").with_default(false).prompt()? {
+  while inquire::Confirm::new("Add new build/deploy artifact?").with_default(first).prompt()? {
     v.push(collect_artifact()?);
+    first = false;
   }
   
   Ok(v)
@@ -284,9 +288,11 @@ fn collect_artifacts() -> anyhow::Result<Vec<String>> {
 
 fn collect_variables() -> anyhow::Result<Vec<Variable>> {
   let mut v = vec![];
+  let mut first = true;
   
-  while inquire::Confirm::new("Add new project-related variable or secret?").with_default(false).prompt()? {
+  while inquire::Confirm::new("Add new project-related variable or secret?").with_default(first).prompt()? {
     v.push(Variable::new_from_prompt()?);
+    first = false;
   }
   
   Ok(v)
@@ -300,12 +306,14 @@ fn collect_af_inplacements(artifacts: &[String]) -> anyhow::Result<Vec<(String, 
   
   let mut v = vec![];
   let mut prompt = FIRST_PROMPT;
+  let mut first = true;
   
-  while Confirm::new(prompt).with_default(false).prompt()? {
+  while Confirm::new(prompt).with_default(first).prompt()? {
     let from = Select::new("Select project's artifact:", artifacts.to_owned()).prompt()?;
     let to = Text::new("Enter relative path of artifact inplacement (inside `artifacts` subfolder):").prompt()?;
     v.push((from, to));
     prompt = ANOTHER_PROMPT;
+    first = false;
   }
   
   Ok(v)

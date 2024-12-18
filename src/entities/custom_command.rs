@@ -288,22 +288,54 @@ impl Execute for CustomCommand {
       for every_start in replacements {
         let mut bash_c = self.bash_c.to_owned();
         
-        for (from, to) in every_start {
-          bash_c = bash_c.replace(from, to.get_value()?);
-        }
+        for (from, to) in every_start { bash_c = bash_c.replace(from, to.get_value()?); }
         
         let bash_c_info = format!(r#"{} -c "{}""#, shell, bash_c).green();
+        let mut cmd = std::process::Command::new(&shell);
+        cmd.current_dir(env.build_dir).arg("-c").arg(&bash_c);
         
-        let command_output = std::process::Command::new(&shell)
-          .current_dir(env.build_dir)
-          .arg("-c")
-          .arg(&bash_c)
-          .stdout(std::process::Stdio::piped())
-          .stderr(std::process::Stdio::piped())
-          .spawn()
-          .map_err(|e| anyhow::anyhow!("Can't execute `{}` due to: {}", bash_c_info, e))?
-          .wait_with_output()
-          .map_err(|e| anyhow::anyhow!("Can't wait for output `{}` due to: {}", bash_c_info, e))?;
+        if !env.no_pipe { cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped()); }
+        
+        let mut child = cmd.spawn().map_err(|e| anyhow::anyhow!("Can't execute command due to: {}", e))?;
+        
+        let success = if env.no_pipe {
+          let res = child.wait().map_err(|e| anyhow::anyhow!("Can't wait for exit status due to: {}", e))?;
+          res.success()
+        } else {
+          let command_output = child.wait_with_output().map_err(|e| anyhow::anyhow!("Can't wait for output due to: {}", e))?;
+          
+          let stdout_strs = String::from_utf8_lossy_owned(command_output.stdout);
+          let stderr_strs = String::from_utf8_lossy_owned(command_output.stderr);
+          output.extend_from_slice(&compose_output(
+            bash_c_info.to_string(),
+            stdout_strs,
+            stderr_strs,
+            command_output.status.success(),
+            self.show_success_output,
+            self.show_bash_c,
+          ));
+          
+          command_output.status.success()
+        };
+        
+        if !self.ignore_fails && !success {
+          return Ok((false, output))
+        }
+      }
+    } else {
+      let bash_c_info = format!(r#"{} -c "{}""#, shell, self.bash_c.as_str()).green();
+      let mut cmd = std::process::Command::new(&shell);
+      cmd.current_dir(env.build_dir).arg("-c").arg(&self.bash_c);
+      
+      if !env.no_pipe { cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped()); }
+      
+      let mut child = cmd.spawn().map_err(|e| anyhow::anyhow!("Can't execute command due to: {}", e))?;
+      
+      let success = if env.no_pipe {
+        let res = child.wait().map_err(|e| anyhow::anyhow!("Can't wait for exit status due to: {}", e))?;
+        res.success()
+      } else {
+        let command_output = child.wait_with_output().map_err(|e| anyhow::anyhow!("Can't wait for output due to: {}", e))?;
         
         let stdout_strs = String::from_utf8_lossy_owned(command_output.stdout);
         let stderr_strs = String::from_utf8_lossy_owned(command_output.stderr);
@@ -316,36 +348,10 @@ impl Execute for CustomCommand {
           self.show_bash_c,
         ));
         
-        if !self.ignore_fails && !command_output.status.success() {
-          return Ok((false, output))
-        }
-      }
-    } else {
-      let bash_c_info = format!(r#"{} -c "{}""#, shell, self.bash_c.as_str()).green();
+        command_output.status.success()
+      };
       
-      let command_output = std::process::Command::new(&shell)
-        .current_dir(env.build_dir)
-        .arg("-c")
-        .arg(self.bash_c.as_str())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|e| anyhow::anyhow!("Can't execute `{}` due to: {}", bash_c_info, e))?
-        .wait_with_output()
-        .map_err(|e| anyhow::anyhow!("Can't wait for output `{}` due to: {}", bash_c_info, e))?;
-      
-      let stdout_strs = String::from_utf8_lossy_owned(command_output.stdout);
-      let stderr_strs = String::from_utf8_lossy_owned(command_output.stderr);
-      output.extend_from_slice(&compose_output(
-        bash_c_info.to_string(),
-        stdout_strs,
-        stderr_strs,
-        command_output.status.success(),
-        self.show_success_output,
-        self.show_bash_c,
-      ));
-      
-      if !self.ignore_fails && !command_output.status.success() {
+      if !self.ignore_fails && !success {
         return Ok((false, output))
       }
     }

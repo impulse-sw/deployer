@@ -107,7 +107,7 @@ pub(crate) fn list_pipelines(
     let pipeline_title = format!("[{}]", pipeline.title);
     let tags = if pipeline.tags.is_empty() { String::new() } else { format!(" (tags: {})", pipeline.tags.join(", ").as_str().blue().italic()) };
     println!("• {} {}{}", pipeline_info.blue().bold(), pipeline_title.green().bold(), tags);
-    println!("\t> {}", pipeline.desc.green().italic());
+    if !pipeline.desc.is_empty() { println!("\t> {}", pipeline.desc.green().italic()); }
   }
   
   Ok(())
@@ -217,8 +217,11 @@ fn collect_multiple_actions(
   use inquire::Confirm;
   
   let mut actions = Vec::new();
-  while Confirm::new("Add Action? (y/n)").prompt()? {
+  let mut first = true;
+  
+  while Confirm::new("Add Action?").with_default(first).prompt()? {
     actions.push(select_action(globals)?);
+    first = false;
   }
   Ok(actions)
 }
@@ -322,6 +325,8 @@ pub(crate) fn assign_pipeline_to_project(
       .ok_or_else(|| anyhow::anyhow!("There is no such Pipeline in Registry. See available Pipelines with `deployer ls pipelines`."))?
       .clone()
   } else if !globals.pipelines_registry.is_empty() {
+    const NEW_PIPELINE: &str = "· Specify another Pipeline";
+    
     let mut ptags = hmap!();
     let mut tags = vec![];
     
@@ -330,13 +335,18 @@ pub(crate) fn assign_pipeline_to_project(
       .iter()
       .map(|(k, v)| (format!("`{}` - {}", k.blue().bold(), v.title.green().bold()), v))
       .for_each(|(t, p)| { tags.push(t.clone()); ptags.insert(t, p); });
+    tags.push(NEW_PIPELINE.to_string());
     
     let selected = inquire::Select::new("Select the Pipeline for this project:", tags).prompt()?;
-    let pipeline = ptags
-      .get(&selected)
-      .ok_or(anyhow::anyhow!("There is no such Pipeline in Registry. See available Pipelines with `deployer ls pipelines`."))?;
     
-    (*pipeline).clone()
+    if selected.as_str() == NEW_PIPELINE {
+      DescribedPipeline::new_from_prompt(globals)?
+    } else {
+      let pipeline = ptags
+        .get(&selected)
+        .ok_or(anyhow::anyhow!("There is no such Pipeline in Registry. See available Pipelines with `deployer ls pipelines`."))?;
+      (*pipeline).clone()
+    }
   } else {
     DescribedPipeline::new_from_prompt(globals)?
   };

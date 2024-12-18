@@ -612,7 +612,7 @@ pub(crate) fn list_actions(
     let action_title = format!("[{}]", action.title);
     let tags = if action.tags.is_empty() { String::new() } else { format!(" (tags: {})", action.tags.join(", ").as_str().blue().italic()) };
     println!("• {} {}{}", action_info.blue().bold(), action_title.green().bold(), tags);
-    println!("\t> {}", action.desc.green().italic());
+    if !action.desc.is_empty() { println!("\t> {}", action.desc.green().italic()); }
   }
 }
 
