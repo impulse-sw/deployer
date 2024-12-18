@@ -138,8 +138,9 @@ pub(crate) struct CleanArgs {
 
 #[derive(Args, Debug)]
 pub(crate) struct BuildArgs {
-  /// {short-name}
-  pub(crate) pipeline_tag: Option<String>,
+  /// {short-name} or {short-name1},{short-name2},..
+  #[arg(required = false, value_delimiter(','))]
+  pub(crate) pipeline_tags: Vec<String>,
   
   /// Build in current folder
   #[arg(short('j'), long)]

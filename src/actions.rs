@@ -716,8 +716,8 @@ pub(crate) fn cat_action(
     Some(action) => action,
   };
   
-  let action_yaml = serde_json::to_string_pretty(&action).unwrap();
-  println!("{}", action_yaml);
+  let action_json = serde_json::to_string_pretty(&action).unwrap();
+  println!("{}", action_json);
   
   Ok(())
 }

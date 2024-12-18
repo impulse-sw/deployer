@@ -17,8 +17,7 @@ use crate::utils::ordered_map;
 #[derive(Deserialize, Serialize, PartialEq, Default, Debug)]
 pub(crate) struct DeployerProjectOptions {
   /// Название проекта.
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub(crate) project_name: Option<String>,
+  pub(crate) project_name: String,
   /// Языки
   pub(crate) langs: Vec<ProgrammingLanguage>,
   /// Таргеты

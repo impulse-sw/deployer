@@ -271,8 +271,8 @@ pub(crate) fn cat_pipeline(
     Some(pipeline) => pipeline,
   };
   
-  let pipeline_yaml = serde_json::to_string_pretty(&pipeline).unwrap();
-  println!("{}", pipeline_yaml);
+  let pipeline_json = serde_json::to_string_pretty(&pipeline).unwrap();
+  println!("{}", pipeline_json);
   
   Ok(())
 }

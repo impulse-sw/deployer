@@ -1,8 +1,8 @@
 use colored::Colorize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-use crate::{DEPLOY_CACHE_SUBDIR, DEPLOY_ARTIFACTS_SUBDIR, DEPLOY_CONF_FILE};
+use crate::{CACHE_DIR, ARTIFACTS_DIR, PROJECT_CONF};
 use crate::actions::*;
 use crate::entities::{
   traits::Execute,
@@ -11,7 +11,7 @@ use crate::entities::{
 use crate::cmd::{BuildArgs, CleanArgs};
 use crate::configs::DeployerProjectOptions;
 use crate::pipelines::DescribedPipeline;
-use crate::rw::{copy_all, write, symlink, log};
+use crate::rw::{copy_all, write, symlink, log, generate_build_log_filepath, build_log};
 use crate::utils::get_current_working_dir;
 
 fn enplace_artifacts(
@@ -19,7 +19,7 @@ fn enplace_artifacts(
   env: BuildEnvironment,
   panic_when_not_found: bool,
 ) -> anyhow::Result<()> {
-  let mut ignore = vec![DEPLOY_ARTIFACTS_SUBDIR];
+  let mut ignore = vec![ARTIFACTS_DIR];
   ignore.extend_from_slice(&(config.cache_files.iter().map(|c| c.as_str()).collect::<Vec<_>>()));
   
   for (from, to) in &config.inplace_artifacts_into_project_root {
@@ -34,19 +34,19 @@ fn enplace_artifacts(
   Ok(())
 }
 
-pub(crate) fn prepare_artifacts_folder(
+fn prepare_artifacts_folder(
   current_dir: &std::path::Path,
 ) -> anyhow::Result<PathBuf> {
-  let artifacts_dir = current_dir.join(DEPLOY_ARTIFACTS_SUBDIR);
+  let artifacts_dir = current_dir.join(ARTIFACTS_DIR);
   std::fs::create_dir_all(artifacts_dir.as_path()).unwrap_or_else(|_| panic!("Can't create `{:?}` folder!", artifacts_dir));
   
   Ok(artifacts_dir)
 }
 
-pub(crate) fn prepare_build_folder(
+fn prepare_build_folder(
   config: &mut DeployerProjectOptions,
   current_dir: &std::path::Path,
-  cache_dir: &str,
+  cache_dir: &Path,
   mut fresh: bool,
   link_cache: bool,
   copy_cache: bool,
@@ -54,7 +54,7 @@ pub(crate) fn prepare_build_folder(
 ) -> anyhow::Result<PathBuf> {
   let mut build_path = PathBuf::new();
   build_path.push(cache_dir);
-  build_path.push(DEPLOY_CACHE_SUBDIR);
+  build_path.push(CACHE_DIR);
   if !build_path.exists() { *new_build = true; }
   std::fs::create_dir_all(build_path.as_path()).unwrap_or_else(|_| panic!("Can't create `{:?}` folder!", build_path));
   
@@ -74,11 +74,11 @@ pub(crate) fn prepare_build_folder(
   
   build_path.push(uuid.clone());
   
-  let mut ignore = vec![DEPLOY_ARTIFACTS_SUBDIR, &uuid];
+  let mut ignore = vec![ARTIFACTS_DIR, &uuid];
   ignore.extend_from_slice(&config.cache_files.iter().map(|v| v.as_str()).collect::<Vec<_>>());
   
   copy_all(get_current_working_dir().unwrap(), build_path.as_path(), &ignore)?;
-  write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
+  write(get_current_working_dir().unwrap(), PROJECT_CONF, &config);
   
   if link_cache {
     for cache_item in &config.cache_files {
@@ -103,8 +103,8 @@ pub(crate) fn prepare_build_folder(
 
 pub(crate) fn build(
   config: &mut DeployerProjectOptions,
-  cache_dir: &str,
-  args: &mut BuildArgs,
+  cache_dir: &Path,
+  args: &BuildArgs,
 ) -> anyhow::Result<()> {
   if *config == Default::default() { panic!("Config is invalid!"); }
   
@@ -120,13 +120,6 @@ pub(crate) fn build(
   
   let mut new_build = false;
   
-  if
-    let Some(pipeline_tag) = &args.pipeline_tag &&
-    !config.pipelines.iter().any(|p| p.title.as_str() == pipeline_tag.as_str())
-  {
-    panic!("There is no such Pipeline set up for this project. Maybe, you've forgotten `deployer with {{pipeline-short-name-and-ver}}`?");
-  }
-  
   let curr_dir = std::env::current_dir().expect("Can't get current dir!");
   let artifacts_dir = prepare_artifacts_folder(&curr_dir)?;
   let build_path = if args.current { curr_dir } else {
@@ -135,27 +128,30 @@ pub(crate) fn build(
   
   let env = BuildEnvironment {
     build_dir: &build_path,
+    cache_dir,
     artifacts_dir: &artifacts_dir,
     new_build,
     silent_build: args.silent,
     no_pipe: args.no_pipe,
   };
   
-  if
-    let Some(pipeline_tag) = &args.pipeline_tag &&
-    let Some(pipeline) = config.pipelines.iter().find(|p| p.title.as_str() == pipeline_tag)
-  {
-    execute_pipeline(config, env, pipeline)?;
-  } else {
+  if args.pipeline_tags.is_empty() {
     if config.pipelines.is_empty() {
-      anyhow::bail!("The pipelines' list is empty! Check the config file for errors.")
+      panic!("The pipelines' list is empty! Check the config file for errors.");
     }
-    
     if let Some(pipeline) = &config.pipelines.iter().find(|p| p.default.is_some_and(|v| v)) {
       execute_pipeline(config, env, pipeline)?;
-    } else {
-      for pipeline in &config.pipelines {
+    }
+  } else {
+    for pipeline_tag in &args.pipeline_tags {
+      if let Some(pipeline) = config.pipelines.iter().find(|p| p.title.as_str().eq(pipeline_tag)) {
         execute_pipeline(config, env, pipeline)?;
+      } else {
+        panic!(
+          "There is no such Pipeline `{}` set up for this project. Maybe, you've forgotten set up this Pipeline for project via `{}`?",
+          pipeline_tag.green(),
+          "deployer with {pipeline-short-name-and-ver}".green(),
+        );
       }
     }
   }
@@ -175,7 +171,15 @@ fn execute_pipeline(
   use std::io::{stdout, Write};
   use std::time::Instant;
   
+  let log_file = generate_build_log_filepath(
+    &config.project_name,
+    &pipeline.title,
+    env.cache_dir,
+  );
+  
   if !env.silent_build { println!("Starting the `{}` Pipeline...", pipeline.title); }
+  build_log(&log_file, &[format!("Starting the `{}` Pipeline...", pipeline.title)])?;
+  
   let mut cntr = 1usize;
   let total = pipeline.actions.len();
   for action in &pipeline.actions {
@@ -185,6 +189,7 @@ fn execute_pipeline(
       } else {
         println!("[{}/{}] `{}` Action... ", cntr, total, action.title.blue().italic());
       }
+      build_log(&log_file, &[format!("[{}/{}] `{}` Action... ", cntr, total, action.title)])?;
     }
     stdout().flush()?;
     let now = Instant::now();
@@ -201,7 +206,7 @@ fn execute_pipeline(
         enplace_artifacts(config, env, false)?;
         
         let mut modified_env = env;
-        let artifacts_dir = modified_env.build_dir.to_path_buf().join(DEPLOY_ARTIFACTS_SUBDIR);
+        let artifacts_dir = modified_env.build_dir.to_path_buf().join(ARTIFACTS_DIR);
         modified_env.artifacts_dir = &artifacts_dir;
         enplace_artifacts(config, modified_env, false)?;
         
@@ -225,10 +230,14 @@ fn execute_pipeline(
       
       if !env.no_pipe {
         println!("{} ({}).", status_str, format!("{:.2?}", elapsed).green());
+        build_log(&log_file, &output)?;
         for line in output { println!("{}", line); }
       } else {
         println!("[{}/{}] `{}` Action - {} ({}).", cntr, total, action.title.blue().italic(), status_str, format!("{:.2?}", elapsed).green());
       }
+      build_log(&log_file, &[
+        format!("[{}/{}] `{}` Action - {} ({:.2?}).", cntr, total, action.title, if status { "done" } else { "got an error!" }, elapsed),
+      ])?;
     }
     
     cntr += 1;
@@ -241,12 +250,12 @@ fn execute_pipeline(
 
 pub(crate) fn clean_builds(
   config: &mut DeployerProjectOptions,
-  cache_dir: &str,
+  cache_dir: &Path,
   args: &CleanArgs,
 ) -> anyhow::Result<()> {
   let mut path = PathBuf::new();
   path.push(cache_dir);
-  path.push(DEPLOY_CACHE_SUBDIR);
+  path.push(CACHE_DIR);
   
   config.last_build = None;
   for build in &config.builds {
@@ -258,7 +267,7 @@ pub(crate) fn clean_builds(
   
   if args.include_artifacts {
     let curr_dir = std::env::current_dir()?;
-    let artifacts_dir = curr_dir.join(DEPLOY_ARTIFACTS_SUBDIR);
+    let artifacts_dir = curr_dir.join(ARTIFACTS_DIR);
     if artifacts_dir.as_path().exists() {
       let _ = std::fs::remove_dir_all(artifacts_dir);
     }

@@ -39,10 +39,13 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-static DEPLOY_CONF_FILE: &str = "deploy-config.json";
-static DEPLOY_GLOBAL_CONF_FILE: &str = "deploy-global.json";
-pub(crate) static DEPLOY_CACHE_SUBDIR: &str = "deploy-cache";
-pub(crate) static DEPLOY_ARTIFACTS_SUBDIR: &str = "artifacts";
+static PROJECT_CONF: &str = "deploy-config.json";
+static GLOBAL_CONF: &str = "deploy-global.json";
+
+pub(crate) static CACHE_DIR: &str = "deploy-cache";
+pub(crate) static LOGS_DIR: &str = "logs";
+
+pub(crate) static ARTIFACTS_DIR: &str = "artifacts";
 
 #[cfg(not(unix))]
 compile_error!("`deployer` can't work with non-Unix systems.");
@@ -61,85 +64,80 @@ fn main() {
   let args = Cli::parse();
   
   if args.verbose {
-    VERBOSE.set(true).unwrap();
+    if let DeployerExecType::Build(build_args) = &args.r#type && build_args.silent { VERBOSE.set(false).unwrap(); }
+    else { VERBOSE.set(true).unwrap(); }
   } else {
     VERBOSE.set(false).unwrap();
   }
   
   // Определение рабочих директорий
   let cache_folder = if args.cache_folder.is_none() {
-    cache_dir()
-      .expect("Can't get `cache` directory's location automatically, please specify one.")
-      .to_str()
-      .expect("Can't convert `PathBuf` to `str` for `cache` folder!")
-      .to_string()
+    cache_dir().expect("Can't get `cache` directory's location automatically, please specify one.")
   } else {
-    args.cache_folder.as_ref().unwrap().to_string()
+    let path = std::path::PathBuf::new();
+    path.join(args.cache_folder.as_ref().unwrap())
   };
   let config_folder = if args.config_folder.is_none() {
-    config_dir()
-      .expect("Can't get `config` directory's location automatically, please specify one.")
-      .to_str()
-      .expect("Can't convert `PathBuf` to `str` for `config` folder!")
-      .to_string()
+    config_dir().expect("Can't get `config` directory's location automatically, please specify one.")
   } else {
-    args.config_folder.as_ref().unwrap().to_string()
+    let path = std::path::PathBuf::new();
+    path.join(args.config_folder.as_ref().unwrap())
   };
   
   // Чтение конфигов
-  let mut globals = read::<DeployerGlobalConfig>(&config_folder, DEPLOY_GLOBAL_CONF_FILE);
-  let mut config = read::<DeployerProjectOptions>(&get_current_working_dir().unwrap(), DEPLOY_CONF_FILE);
+  let mut globals = read::<DeployerGlobalConfig>(&config_folder, GLOBAL_CONF);
+  let mut config = read::<DeployerProjectOptions>(&get_current_working_dir().unwrap(), PROJECT_CONF);
   
   match args.r#type {
     DeployerExecType::Ls(ListType::Actions) => list_actions(&globals),
     DeployerExecType::New(NewType::Action(args)) => {
       let _ = new_action(&mut globals, &args).unwrap();
-      write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
+      write(&config_folder, GLOBAL_CONF, &globals);
     },
     DeployerExecType::Cat(CatType::Action(args)) => cat_action(&globals, &args).unwrap(),
     DeployerExecType::Edit(EditType::Action(args)) => {
       edit_action(&mut globals, &args).unwrap();
-      write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
+      write(&config_folder, GLOBAL_CONF, &globals);
     },
     DeployerExecType::Rm(RemoveType::Action) => {
       remove_action(&mut globals).unwrap();
-      write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
+      write(&config_folder, GLOBAL_CONF, &globals);
     },
     
     DeployerExecType::Ls(ListType::Pipelines) => list_pipelines(&globals).unwrap(),
     DeployerExecType::New(NewType::Pipeline(args)) => {
       new_pipeline(&mut globals, &args).unwrap();
-      write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
+      write(&config_folder, GLOBAL_CONF, &globals);
     },
     DeployerExecType::Cat(CatType::Pipeline(args)) => cat_pipeline(&globals, &args).unwrap(),
     DeployerExecType::Edit(EditType::Pipeline(args)) => {
       edit_pipeline(&mut globals, &args).unwrap();
-      write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
+      write(&config_folder, GLOBAL_CONF, &globals);
     },
     DeployerExecType::Rm(RemoveType::Pipeline) => {
       remove_pipeline(&mut globals).unwrap();
-      write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
+      write(&config_folder, GLOBAL_CONF, &globals);
     },
     
     DeployerExecType::Init(args) => {
       init(&mut globals, &mut config, &args).unwrap();
-      write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
+      write(get_current_working_dir().unwrap(), PROJECT_CONF, &config);
     },
     DeployerExecType::With(args) => {
       assign_pipeline_to_project(&mut globals, &mut config, &args).unwrap();
-      write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
-      write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
+      write(&config_folder, GLOBAL_CONF, &globals);
+      write(get_current_working_dir().unwrap(), PROJECT_CONF, &config);
     },
     DeployerExecType::Cat(CatType::Project) => cat_project_pipelines(&config).unwrap(),
     DeployerExecType::Edit(EditType::Project) => {
       edit_project(&mut globals, &mut config).unwrap();
-      write(&config_folder, DEPLOY_GLOBAL_CONF_FILE, &globals);
-      write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
+      write(&config_folder, GLOBAL_CONF, &globals);
+      write(get_current_working_dir().unwrap(), PROJECT_CONF, &config);
     },
-    DeployerExecType::Build(mut args) => build(&mut config, &cache_folder, &mut args).unwrap(),
+    DeployerExecType::Build(args) => build(&mut config, &cache_folder, &args).unwrap(),
     DeployerExecType::Clean(args) => {
       clean_builds(&mut config, &cache_folder, &args).unwrap();
-      write(get_current_working_dir().unwrap(), DEPLOY_CONF_FILE, &config);
+      write(get_current_working_dir().unwrap(), PROJECT_CONF, &config);
     },
     
     #[cfg(feature = "tests")]
