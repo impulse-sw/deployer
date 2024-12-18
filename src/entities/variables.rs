@@ -11,7 +11,7 @@ pub(crate) struct Variable {
   pub(crate) value: VarValue,
 }
 
-impl<'a> Variable {
+impl Variable {
   pub(crate) fn new_from_prompt() -> anyhow::Result<Self> {
     let title = inquire::Text::new("Enter your variable's title:").prompt()?;
     println!("{} if variable is a secret, then no command containing this variable will be printed during the build stage.", "Note:".green().italic());
@@ -35,7 +35,7 @@ impl<'a> Variable {
     }
   }
   
-  pub(crate) fn get_value(&'a self) -> anyhow::Result<&'a str> {
+  pub(crate) fn get_value(&self) -> anyhow::Result<&str> {
     match &self.value {
       VarValue::Plain(val) => Ok(val.as_str()),
       // VarValue::FromEnvFile(_) => unimplemented!(),
