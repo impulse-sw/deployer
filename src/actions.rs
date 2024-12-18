@@ -230,7 +230,7 @@ impl DescribedAction {
       },
       "Observe" => {
         let tags = tags_custom_type("Enter observe tags:").prompt()?;
-        let command = CustomCommand::new_from_prompt()?;
+        let command = CustomCommand::new_from_prompt_unspecified()?;
         
         Action::Observe(ObserveAction { tags, command })
       },

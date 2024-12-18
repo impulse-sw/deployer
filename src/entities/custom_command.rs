@@ -58,6 +58,23 @@ impl CustomCommand {
     })
   }
   
+  pub(crate) fn new_from_prompt_unspecified() -> anyhow::Result<CustomCommand> {
+    let bash_c = specify_bash_c()?;
+    
+    let placeholders = tags_custom_type("Enter command placeholders, if any:").prompt()?;
+    let placeholders = if placeholders.is_empty() { None } else { Some(placeholders) };
+    
+    Ok(CustomCommand {
+      bash_c,
+      placeholders,
+      ignore_fails: true,
+      show_success_output: true,
+      show_bash_c: false,
+      only_when_fresh: Some(false),
+      replacements: None,
+    })
+  }
+  
   pub(crate) fn prompt_setup_for_project(
     &self,
     info: &ActionInfo,

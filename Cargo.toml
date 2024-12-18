@@ -8,6 +8,7 @@ anyhow = "1.0"
 chrono = "0.4"
 clap = { version = "4.5", features = ["derive"] }
 colored = "2"
+ctrlc = "3.4"
 dirs = "5.0"
 inquire = { git = "https://github.com/markcda/inquire.git", branch = "feat/reorder-values", features = ["reorder"] }
 mimalloc = "0.1.43"

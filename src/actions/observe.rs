@@ -12,6 +12,8 @@ pub(crate) struct ObserveAction {
 
 impl Execute for ObserveAction {
   fn execute(&self, env: BuildEnvironment) -> anyhow::Result<(bool, Vec<String>)> {
-    self.command.execute(env)
+    let mut observe_env = env;
+    observe_env.no_pipe = true;
+    self.command.execute(observe_env)
   }
 }
