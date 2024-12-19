@@ -132,7 +132,7 @@ pub(crate) fn generate_build_log_filepath(
   
   let curr_dt = Local::now();
   
-  let log_path = logs_path.join(format!("{}-{}-{}.txt", project_name, pipeline_short_name, curr_dt.format("%Y-%m-%d-%H:%M")));
+  let log_path = logs_path.join(format!("{}-{}-{}.txt", project_name.replace('/', "-"), pipeline_short_name, curr_dt.format("%Y-%m-%d-%H:%M")));
   if log_path.exists() { build_log(&log_path, &[LOG_FILE_DELIMETER.to_string()]).expect("Current log file is unwriteable!"); }
   
   log_path
