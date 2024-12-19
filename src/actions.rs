@@ -99,7 +99,7 @@ impl DescribedAction {
     let name = Text::new("Write the Action's full name:").prompt()?;
     let desc = Text::new("Write the Action's description:").prompt()?;
     
-    let tags: Vec<String> = tags_custom_type("Write Action's tags, if any:").prompt()?;
+    let tags: Vec<String> = tags_custom_type("Write Action's tags, if any:", None).prompt()?;
     
     let action_types: Vec<&str> = vec![
       "Interrupt",
@@ -130,9 +130,9 @@ impl DescribedAction {
         Action::Custom(command)
       },
       "Check" => {
-        let bash_c = specify_bash_c()?;
+        let bash_c = specify_bash_c(None)?;
         
-        let placeholders = tags_custom_type("Enter command placeholders, if any:").prompt()?;
+        let placeholders = tags_custom_type("Enter command placeholders, if any:", None).prompt()?;
         let placeholders = if placeholders.is_empty() { None } else { Some(placeholders) };
         
         let ignore_fails = !inquire::Confirm::new("Does the command failure also means check failure?").with_default(true).prompt()?;
@@ -212,7 +212,7 @@ impl DescribedAction {
       },
       action_type @ ("Configure deploy" | "Deploy" | "Post-deploy") => {
         let deploy_toolkit = Text::new("Enter deploy toolkit name (or hit `esc`):").prompt_skippable()?;
-        let tags = tags_custom_type("Enter deploy tags:").prompt()?;
+        let tags = tags_custom_type("Enter deploy tags:", None).prompt()?;
         let commands = collect_multiple_commands()?;
         
         let action = DeployAction {
@@ -229,7 +229,7 @@ impl DescribedAction {
         }
       },
       "Observe" => {
-        let tags = tags_custom_type("Enter observe tags:").prompt()?;
+        let tags = tags_custom_type("Enter observe tags:", None).prompt()?;
         let command = CustomCommand::new_from_prompt_unspecified()?;
         
         Action::Observe(ObserveAction { tags, command })
@@ -423,9 +423,12 @@ impl DescribedAction {
       actions.clone(),
     ).prompt_skippable()? {
       match action {
-        "Edit title" => self.title = inquire::Text::new("Write the Action's full name:").prompt()?,
-        "Edit description" => self.desc = inquire::Text::new("Write the Action's description:").prompt()?,
-        "Edit tags" => self.tags = tags_custom_type("Write Action's tags, if any:").prompt()?,
+        "Edit title" => self.title = inquire::Text::new("Write the Action's full name:").with_initial_value(self.title.as_str()).prompt()?,
+        "Edit description" => self.desc = inquire::Text::new("Write the Action's description:").with_initial_value(self.desc.as_str()).prompt()?,
+        "Edit tags" => {
+          let joined = self.tags.join(", ");
+          self.tags = tags_custom_type("Write Action's tags, if any:", if joined.is_empty() { None } else { Some(joined.as_str()) }).prompt()?
+        },
         "Edit command" => {
           if let Action::Custom(cmd) = &mut self.action {
             cmd.edit_command_from_prompt()?;

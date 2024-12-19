@@ -37,9 +37,9 @@ pub(crate) struct CustomCommand {
 impl CustomCommand {
   /// Создаёт новую команду.
   pub(crate) fn new_from_prompt() -> anyhow::Result<CustomCommand> {
-    let bash_c = specify_bash_c()?;
+    let bash_c = specify_bash_c(None)?;
     
-    let placeholders = tags_custom_type("Enter command placeholders, if any:").prompt()?;
+    let placeholders = tags_custom_type("Enter command placeholders, if any:", None).prompt()?;
     let placeholders = if placeholders.is_empty() { None } else { Some(placeholders) };
     
     let ignore_fails = inquire::Confirm::new("Ignore command failures?").with_default(false).prompt()?;
@@ -59,9 +59,9 @@ impl CustomCommand {
   }
   
   pub(crate) fn new_from_prompt_unspecified() -> anyhow::Result<CustomCommand> {
-    let bash_c = specify_bash_c()?;
+    let bash_c = specify_bash_c(None)?;
     
-    let placeholders = tags_custom_type("Enter command placeholders, if any:").prompt()?;
+    let placeholders = tags_custom_type("Enter command placeholders, if any:", None).prompt()?;
     let placeholders = if placeholders.is_empty() { None } else { Some(placeholders) };
     
     Ok(CustomCommand {
@@ -145,9 +145,14 @@ impl CustomCommand {
       ],
     ).prompt_skippable()? {
       match action {
-        "Edit bash command" => self.bash_c = specify_bash_c()?,
+        "Edit bash command" => self.bash_c = specify_bash_c(Some(self.bash_c.as_str()))?,
         "Change command placeholders" => {
-          let placeholders = tags_custom_type("Enter command placeholders, if any:").prompt()?;
+          let placeholders = if let Some(phs) = &self.placeholders {
+            let joined = phs.join(", ");
+            tags_custom_type("Enter command placeholders, if any:", Some(joined.as_str())).prompt()?
+          } else {
+            tags_custom_type("Enter command placeholders, if any:", None).prompt()?
+          };
           self.placeholders = if placeholders.is_empty() { None } else { Some(placeholders) };
         },
         "Change command failure ignorance" => {
@@ -174,10 +179,12 @@ impl CustomCommand {
   }
 }
 
-pub(crate) fn specify_bash_c() -> anyhow::Result<String> {
+pub(crate) fn specify_bash_c(default: Option<&str>) -> anyhow::Result<String> {
   let mut bash_c;
   loop {
-    bash_c = inquire::Text::new("Enter typical shell command (or enter '/h' for help):").prompt()?;
+    let mut text_prompt = inquire::Text::new("Enter typical shell command (or enter '/h' for help):");
+    if let Some(default) = default { text_prompt = text_prompt.with_initial_value(default); }
+    bash_c = text_prompt.prompt()?;
     if bash_c.as_str() != "/h" { break }
     println!("Guide: `{}`", "Shell Commands for Deployer".blue());
     println!(">>> The usage of shell commands in Deployer is very simple.");

@@ -13,12 +13,12 @@ pub(crate) fn get_current_working_dir() -> std::io::Result<std::path::PathBuf> {
   std::env::current_dir()
 }
 
-pub(crate) fn tags_custom_type(message: &str) -> CustomType<'_, Vec<String>> {
+pub(crate) fn tags_custom_type<'a>(message: &'a str, default: Option<&'a str>) -> CustomType<'a, Vec<String>> {
   use inquire::ui::RenderConfig;
   
   CustomType {
     message,
-    starting_input: None,
+    starting_input: if default.is_some() { default } else { None },
     default: Some(vec![]),
     placeholder: None,
     help_message: None,

@@ -53,7 +53,7 @@ impl DescribedPipeline {
     let name = Text::new("Write the Pipeline's full name:").prompt()?;
     let desc = Text::new("Write the Pipeline's description:").prompt()?;
     
-    let tags: Vec<String> = tags_custom_type("Write Pipeline's tags, if any:").prompt()?;
+    let tags: Vec<String> = tags_custom_type("Write Pipeline's tags, if any:", None).prompt()?;
     
     let selected_actions_unordered = collect_multiple_actions(globals)?;
     let selected_actions_ordered = reorder_actions(selected_actions_unordered)?;
@@ -84,9 +84,12 @@ impl DescribedPipeline {
       actions.clone(),
     ).prompt_skippable()? {
       match action {
-        "Edit title" => self.title = inquire::Text::new("Write the Action's full name:").prompt()?,
-        "Edit description" => self.desc = inquire::Text::new("Write the Action's description:").prompt()?,
-        "Edit tags" => self.tags = tags_custom_type("Write Action's tags, if any:").prompt()?,
+        "Edit title" => self.title = inquire::Text::new("Write the Action's full name:").with_initial_value(self.title.as_str()).prompt()?,
+        "Edit description" => self.desc = inquire::Text::new("Write the Action's description:").with_initial_value(self.desc.as_str()).prompt()?,
+        "Edit tags" => {
+          let joined = self.tags.join(", ");
+          self.tags = tags_custom_type("Write Action's tags, if any:", if joined.is_empty() { None } else { Some(joined.as_str()) }).prompt()?
+        },
         "Edit Pipeline's Actions" => self.actions.edit_from_prompt(globals)?,
         _ => {},
       }
