@@ -627,5 +627,10 @@ pub(crate) fn execute_pipeline(
     if !status { return Ok(()) }
   }
   
+  let canonicalized = env.build_dir.canonicalize()?;
+  let canonicalized = canonicalized.to_str().expect("Can't convert `Path` to string!");
+  if !env.silent_build { println!("Build path: {}", canonicalized); }
+  build_log(&log_file, &[format!("Build path: {}", canonicalized)])?;
+  
   Ok(())
 }

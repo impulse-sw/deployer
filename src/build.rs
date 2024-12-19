@@ -161,8 +161,6 @@ pub(crate) fn build(
   
   enplace_artifacts(config, env, true)?;
   
-  if !args.silent { println!("Build path: {}", build_path.canonicalize()?.to_str().expect("Can't convert `Path` to string!")); }
-  
   Ok(())
 }
 
