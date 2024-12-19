@@ -321,6 +321,8 @@ pub(crate) fn assign_pipeline_to_project(
   config: &mut DeployerProjectOptions,
   args: &WithPipelineArgs,
 ) -> anyhow::Result<()> {
+  if *config == Default::default() { panic!("Config is invalid! Reinit the project."); }
+  
   let mut pipeline = if let Some(tag) = &args.tag {
     globals
       .pipelines_registry

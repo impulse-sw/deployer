@@ -107,7 +107,7 @@ pub(crate) fn build(
   cache_dir: &Path,
   args: &BuildArgs,
 ) -> anyhow::Result<()> {
-  if *config == Default::default() { panic!("Config is invalid!"); }
+  if *config == Default::default() { panic!("Config is invalid! Reinit the project."); }
   
   if args.link_cache && args.copy_cache { panic!(
     "Select only one option from `{}` and `{}`. See help via `{}`.", "c".green(), "C".green(), "deployer build -h".green()
