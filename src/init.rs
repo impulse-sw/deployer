@@ -9,7 +9,7 @@ pub(crate) fn init(
   let curr_dir = std::env::current_dir().expect("Can't get current dir!").to_str().expect("Can't convert current dir's path to string!").to_owned();
   if !globals.projects.contains(&curr_dir) { globals.projects.push(curr_dir.to_owned()); }
   
-  config.init_from_prompt()?;
+  config.init_from_prompt(curr_dir)?;
   
   println!("Setup is completed. Don't forget to assign at least one Pipeline to the project to build/deploy!");
   

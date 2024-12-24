@@ -61,6 +61,11 @@ fn main() {
     std::process::exit(1);
   }));
   
+  ctrlc::set_handler(move || {
+    println!("\nInterrupted");
+    std::process::exit(0);
+  }).expect("Error setting Ctrl-C handler");
+  
   let args = Cli::parse();
   
   if args.verbose {

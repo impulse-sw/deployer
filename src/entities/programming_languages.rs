@@ -131,7 +131,7 @@ pub(crate) fn specify_programming_languages() -> anyhow::Result<Vec<ProgrammingL
 }
 
 fn collect_multiple_languages() -> anyhow::Result<Vec<ProgrammingLanguage>> {
-  let langs = tags_custom_type("Enter the names of programming languages separated by commas:").prompt()?;
+  let langs = tags_custom_type("Enter the names of programming languages separated by commas:", None).prompt()?;
   let mut v = vec![];
   
   for lang in langs {

@@ -10,10 +10,17 @@ use crate::entities::{
 use crate::hmap;
 
 impl DeployerProjectOptions {
-  pub(crate) fn init_from_prompt(&mut self) -> anyhow::Result<()> {
+  pub(crate) fn init_from_prompt(&mut self, curr_dir: String) -> anyhow::Result<()> {
     use inquire::Text;
     
-    self.project_name = Text::new("Enter the project's name:").prompt()?;
+    #[cfg(unix)]
+    let curr_dir = curr_dir.split('/').last().unwrap();
+    let project_name_proposal = if self.project_name.is_empty() {
+      curr_dir.to_owned()
+    } else {
+      self.project_name.to_owned()
+    };
+    self.project_name = Text::new("Enter the project's name:").with_initial_value(project_name_proposal.as_str()).prompt()?;
     
     self.cache_files.push(".git".to_string());
     println!("Please, specify the project's programming languages to setup default cache folders.");
@@ -323,7 +330,7 @@ pub(crate) fn edit_project(
   globals: &mut DeployerGlobalConfig,
   config: &mut DeployerProjectOptions,
 ) -> anyhow::Result<()> {
-  if *config == Default::default() { panic!("Config is invalid!"); }
+  if *config == Default::default() { panic!("Config is invalid! Reinit the project."); }
   
   config.edit_project_from_prompt(globals)?;
   Ok(())
