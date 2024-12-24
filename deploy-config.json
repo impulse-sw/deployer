@@ -12,10 +12,6 @@
     }
   ],
   "deploy_toolkit": null,
-  "builds": [
-    "deploy-build-0bb0569a-c7f0-4786-aa7f-b1e17e13ecd9"
-  ],
-  "last_build": "deploy-build-0bb0569a-c7f0-4786-aa7f-b1e17e13ecd9",
   "cache_files": [
     ".git",
     "Cargo.lock",

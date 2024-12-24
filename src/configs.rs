@@ -25,12 +25,6 @@ pub(crate) struct DeployerProjectOptions {
   /// Тулкит для развёртывания
   pub(crate) deploy_toolkit: Option<String>,
   
-  /// Сборки
-  pub(crate) builds: Vec<String>,
-  /// Последняя (текущая сборка)
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub(crate) last_build: Option<String>,
-  
   /// Метки кэша
   pub(crate) cache_files: Vec<String>,
   

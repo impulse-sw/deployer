@@ -19,6 +19,7 @@ mod entities;
 mod project;
 
 use crate::actions::{list_actions, new_action, remove_action, cat_action, edit_action};
+use crate::build::Builds;
 use crate::cmd::{Cli, DeployerExecType, ListType, NewType, RemoveType, CatType, EditType};
 use crate::configs::{DeployerGlobalConfig, DeployerProjectOptions};
 use crate::pipelines::{list_pipelines, new_pipeline, remove_pipeline, cat_pipeline, cat_project_pipelines, assign_pipeline_to_project, edit_pipeline};
@@ -41,6 +42,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 static PROJECT_CONF: &str = "deploy-config.json";
 static GLOBAL_CONF: &str = "deploy-global.json";
+static BUILD_CACHE_LIST: &str = "deploy-builds.json";
 
 pub(crate) static CACHE_DIR: &str = "deploy-cache";
 pub(crate) static LOGS_DIR: &str = "logs";
@@ -92,6 +94,7 @@ fn main() {
   // Чтение конфигов
   let mut globals = read::<DeployerGlobalConfig>(&config_folder, GLOBAL_CONF);
   let mut config = read::<DeployerProjectOptions>(&get_current_working_dir().unwrap(), PROJECT_CONF);
+  let mut builds = read::<Builds>(&cache_folder, BUILD_CACHE_LIST);
   
   match args.r#type {
     DeployerExecType::Ls(ListType::Actions) => list_actions(&globals),
@@ -139,10 +142,13 @@ fn main() {
       write(&config_folder, GLOBAL_CONF, &globals);
       write(get_current_working_dir().unwrap(), PROJECT_CONF, &config);
     },
-    DeployerExecType::Build(args) => build(&mut config, &cache_folder, &args).unwrap(),
+    DeployerExecType::Build(args) => {
+      build(&mut config, &mut builds, &cache_folder, &args).unwrap();
+      write(&cache_folder, BUILD_CACHE_LIST, &builds);
+    },
     DeployerExecType::Clean(args) => {
-      clean_builds(&mut config, &cache_folder, &args).unwrap();
-      write(get_current_working_dir().unwrap(), PROJECT_CONF, &config);
+      clean_builds(&config, &mut builds, &cache_folder, &args).unwrap();
+      write(&cache_folder, BUILD_CACHE_LIST, &builds);
     },
     
     #[cfg(feature = "tests")]
