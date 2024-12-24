@@ -46,8 +46,8 @@ impl DeployerProjectOptions {
   
   pub(crate) fn edit_project_from_prompt(&mut self, globals: &mut DeployerGlobalConfig) -> anyhow::Result<()> {
     let actions = vec![
-      "Edit project name",
       "Edit project Pipelines",
+      "Edit project name",
       "Reassign project variables to Actions",
       "Edit cache files",
       "Edit programming languages",
@@ -314,6 +314,8 @@ fn collect_af_inplacements(artifacts: &[String]) -> anyhow::Result<Vec<(String, 
   let mut v = vec![];
   let mut prompt = FIRST_PROMPT;
   let mut first = true;
+  
+  if artifacts.is_empty() { first = false; }
   
   while Confirm::new(prompt).with_default(first).prompt()? {
     let from = Select::new("Select project's artifact:", artifacts.to_owned()).prompt()?;
