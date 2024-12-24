@@ -9,7 +9,6 @@ use crate::configs::{DeployerGlobalConfig, DeployerProjectOptions};
 use crate::entities::{
   environment::BuildEnvironment,
   info::{PipelineInfo, info2str_simple, info2str, str2info},
-  targets::TargetDescription,
   traits::{EditExtended, Execute},
 };
 use crate::hmap;
@@ -34,11 +33,11 @@ pub(crate) struct DescribedPipeline {
   /// Если не установлен, считается как `false`.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub(crate) default: Option<bool>,
-  /// Информация для проекта: зависит ли пайплайн от какого-либо таргета.
+  /// Информация для проекта: должен ли пайплайн выполняться в определённой среде (например, в отдельных папках сборки).
   /// 
-  /// Если зависит, то пайплайн будет выполняться в зависимости от 
+  /// Если зависит, то пайплайн будет выполняться в папках с указанным тегом сборки.
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub(crate) target_dependable: Option<TargetDescription>,
+  pub(crate) exclusive_exec_tag: Option<String>,
 }
 
 impl DescribedPipeline {
@@ -58,6 +57,8 @@ impl DescribedPipeline {
     let selected_actions_unordered = collect_multiple_actions(globals)?;
     let selected_actions_ordered = reorder_actions(selected_actions_unordered)?;
     
+    let exclusive_exec_tag = Text::new("Specify exclusive pipeline tag (or hit `esc`):").prompt_skippable()?;
+    
     let described_pipeline = DescribedPipeline {
       title: name,
       desc,
@@ -65,7 +66,7 @@ impl DescribedPipeline {
       tags,
       actions: selected_actions_ordered,
       default: None,
-      target_dependable: None,
+      exclusive_exec_tag,
     };
     
     Ok(described_pipeline)
@@ -73,10 +74,11 @@ impl DescribedPipeline {
   
   pub(crate) fn edit_pipeline_from_prompt(&mut self, globals: &mut DeployerGlobalConfig) -> anyhow::Result<()> {
     let actions = vec![
+      "Edit Pipeline's Actions",
       "Edit title",
       "Edit description",
       "Edit tags",
-      "Edit Pipeline's Actions",
+      "Edit exclusive execution tag",
     ];
     
     while let Some(action) = inquire::Select::new(
@@ -91,6 +93,13 @@ impl DescribedPipeline {
           self.tags = tags_custom_type("Write Action's tags, if any:", if joined.is_empty() { None } else { Some(joined.as_str()) }).prompt()?
         },
         "Edit Pipeline's Actions" => self.actions.edit_from_prompt(globals)?,
+        "Edit exclusive execution tag" => self.exclusive_exec_tag = if self.exclusive_exec_tag.is_none() {
+          inquire::Text::new("Specify exclusive pipeline tag (or hit `esc`):").prompt_skippable()?
+        } else {
+          inquire::Text::new(
+            "Specify exclusive pipeline tag (or hit `esc`):"
+          ).with_initial_value(self.exclusive_exec_tag.as_ref().unwrap()).prompt_skippable()?
+        },
         _ => {},
       }
     }

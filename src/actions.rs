@@ -397,26 +397,27 @@ impl DescribedAction {
   }
   
   pub(crate) fn edit_action_from_prompt(&mut self) -> anyhow::Result<()> {
-    let mut actions = vec![
-      "Edit title",
-      "Edit description",
-      "Edit tags",
-    ];
+    let mut actions = vec![];
     match &self.action {
       Action::Custom(_) | Action::Observe(_) => { actions.push("Edit command"); },
-      Action::Check(_) => { actions.extend_from_slice(&["Edit regexes", "Edit command"]); }
-      Action::ProjectClean(_) => { actions.extend_from_slice(&["Edit files and folders to remove", "Edit commands"]); },
+      Action::Check(_) => { actions.extend_from_slice(&["Edit command", "Edit regexes"]); }
+      Action::ProjectClean(_) => { actions.extend_from_slice(&["Edit commands", "Edit files and folders to remove"]); },
       Action::PreBuild(_) | Action::Build(_) | Action::PostBuild(_) | Action::Test(_) => {
-        actions.extend_from_slice(&["Edit programming languages", "Edit commands"]);
+        actions.extend_from_slice(&["Edit commands", "Edit programming languages"]);
       },
       Action::Pack(_) | Action::Deliver(_) | Action::Install(_) => {
-        actions.extend_from_slice(&["Edit targets", "Edit commands"]);
+        actions.extend_from_slice(&["Edit commands", "Edit targets"]);
       },
       Action::ConfigureDeploy(_) | Action::Deploy(_) | Action::PostDeploy(_) => {
-        actions.extend_from_slice(&["Edit deploy toolkit", "Edit commands"]);
+        actions.extend_from_slice(&["Edit commands", "Edit deploy toolkit"]);
       },
       Action::Interrupt | Action::ForceArtifactsEnplace => {},
     }
+    actions.extend_from_slice(&[
+      "Edit title",
+      "Edit description",
+      "Edit tags",
+    ]);
     
     while let Some(action) = inquire::Select::new(
       "Select an edit action (hit `esc` when done):",
