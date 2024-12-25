@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-use crate::{CACHE_DIR, ARTIFACTS_DIR, PROJECT_CONF};
+use crate::{CACHE_DIR, ARTIFACTS_DIR, BUILD_CACHE_LIST};
 use crate::entities::environment::BuildEnvironment;
 use crate::cmd::{BuildArgs, CleanArgs};
 use crate::configs::DeployerProjectOptions;
@@ -119,7 +119,7 @@ fn prepare_build_folder(
   ignore.extend_from_slice(&config.cache_files.iter().map(|v| v.as_str()).collect::<Vec<_>>());
   
   copy_all(get_current_working_dir().unwrap(), build_path.as_path(), &ignore)?;
-  write(get_current_working_dir().unwrap(), PROJECT_CONF, &config);
+  write(cache_dir, BUILD_CACHE_LIST, &builds);
   
   if args.link_cache {
     for cache_item in &config.cache_files {
