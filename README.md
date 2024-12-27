@@ -194,7 +194,6 @@ Deployer will consider you to specify some things (e.g., targets - for this proj
     }
   ],
   "deploy_toolkit": null,
-  "builds": [],
   "cache_files": [
     "Cargo.lock",
     "target"
