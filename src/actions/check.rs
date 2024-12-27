@@ -9,6 +9,7 @@ use crate::entities::{
   traits::Execute,
   variables::Variable,
 };
+use crate::i18n;
 use crate::utils::{regexopt2str, str2regexopt, str2regex_simple};
 
 /// Команда, проверяющая вывод на определённое условие.
@@ -37,37 +38,34 @@ impl PartialEq for CheckAction {
 
 impl CheckAction {
   pub(crate) fn change_regexes_from_prompt(&mut self) -> anyhow::Result<()> {
-    println!("Current regexes are:");
+    println!("{}", i18n::CHECK_CURR_REGEX);
     println!("`success_when_found` = {:?}", self.success_when_found);
     println!("`success_when_not_found` = {:?}", self.success_when_not_found);
     
     loop {
-      if inquire::Confirm::new("Specify success when found some regex?").with_default(true).prompt()? {
-        self.success_when_found = Some(specify_regex("for success on match")?);
+      if inquire::Confirm::new(i18n::SPECIFY_REGEX_SUCC).with_default(true).prompt()? {
+        self.success_when_found = Some(specify_regex(i18n::SPECIFY_REGEX_FOR_SUCC)?);
       }
       
-      if inquire::Confirm::new("Specify success when NOT found some regex?").with_default(true).prompt()? {
-        self.success_when_not_found = Some(specify_regex("for success on mismatch")?);
+      if inquire::Confirm::new(i18n::SPECIFY_REGEX_FAIL).with_default(true).prompt()? {
+        self.success_when_not_found = Some(specify_regex(i18n::SPECIFY_REGEX_FOR_FAIL)?);
       }
       
       if self.success_when_found.is_some() || self.success_when_not_found.is_some() { break }
-      else { println!("For `Check` Action you need to specify at least one regex check!"); }
+      else { println!("{}", i18n::CHECK_NEED_TO_AT_LEAST); }
     }
     
     Ok(())
   }
   
   pub(crate) fn edit_check_from_prompt(&mut self) -> anyhow::Result<()> {
-    const EDIT_COMMAND: &str = "Edit check command";
-    const EDIT_REGEXES: &str = "Edit regexes";
-    
     while let Some(selected) = inquire::Select::new(
-      "Specify an action for Check Action:",
-      vec![EDIT_COMMAND, EDIT_REGEXES],
+      i18n::CHECK_SPECIFY_WHAT,
+      vec![i18n::CHECK_EDIT_CMD, i18n::CHECK_EDIT_REGEXES],
     ).prompt_skippable()? {
       match selected {
-        EDIT_COMMAND => self.command.edit_command_from_prompt()?,
-        EDIT_REGEXES => self.change_regexes_from_prompt()?,
+        i18n::CHECK_EDIT_CMD => self.command.edit_command_from_prompt()?,
+        i18n::CHECK_EDIT_REGEXES => self.change_regexes_from_prompt()?,
         _ => {},
       }
     }
@@ -98,18 +96,18 @@ impl Execute for CheckAction {
     
     if let Some(re) = &self.success_when_found {
       let text = command_out.join("\n");
-      if re.is_match(text.as_str()) { output.push(format!("Pattern `{}` found!", re.as_str().green())); }
+      if re.is_match(text.as_str()) { output.push(format!("{} `{}` {}!", i18n::PATTERN, re.as_str().green(), i18n::FOUND)); }
       else {
-        output.push(format!("Pattern `{}` not found!", re.as_str().green()));
+        output.push(format!("{} `{}` {}!", i18n::PATTERN, re.as_str().green(), i18n::NOT_FOUND));
         return Ok((false, output))
       }
     }
     
     if let Some(re) = &self.success_when_not_found {
       let text = command_out.join("\n");
-      if !re.is_match(text.as_str()) { output.push(format!("Pattern `{}` not found!", re.as_str().green())); }
+      if !re.is_match(text.as_str()) { output.push(format!("{} `{}` {}!", i18n::PATTERN, re.as_str().green(), i18n::NOT_FOUND)); }
       else {
-        output.push(format!("Pattern `{}` found!", re.as_str().green()));
+        output.push(format!("{} `{}` {}!", i18n::PATTERN, re.as_str().green(), i18n::FOUND));
         return Ok((false, output))
       }
     }
@@ -123,21 +121,21 @@ pub(crate) fn specify_regex(for_what: &str) -> anyhow::Result<Regex> {
   
   loop {
     regex_str = inquire::Text::new(
-      &format!("Enter regex {} (or enter '/h' for help):", for_what)
+      &format!("{} {} {}:", i18n::CHECK_ENTER_REGEX, for_what, i18n::CHECK_HELP)
     ).prompt()?;
     
     if let Err(e) = Regex::new(&regex_str) {
-      println!("The regex you've written is invalid due to: {:?}.", e);
+      println!("{}: {:?}.", i18n::CHECK_REGEX_INVALID_DUE, e);
       continue
     }
     
     if regex_str.as_str() != "/h" { break }
-    println!("Guide: `{}`", "Regex Checks for Deployer".blue());
-    println!(">>> The usage of regex checks in Deployer is simple enough.");
-    println!(">>> If you want to specify some text that needed to be found, you simply write this text.");
+    println!("{}: `{}`", i18n::GUIDE, i18n::CHECK_GUIDE_TITLE.blue());
+    println!(">>> {}", i18n::CHECK_GUIDE_1);
+    println!(">>> {}", i18n::CHECK_GUIDE_2);
     println!(">>> ");
-    println!(">>> For any supported regex read this: {}", "https://docs.rs/regex/latest/regex/".blue());
-    println!(">>> For checks use this: {} (select `Rust` flavor at left side panel)", "https://regex101.com/".blue());
+    println!(">>> {}: {}", i18n::CHECK_GUIDE_3, "https://docs.rs/regex/latest/regex/".blue());
+    println!(">>> {}: {} ({})", i18n::CHECK_GUIDE_4, "https://regex101.com/".blue(), i18n::CHECK_GUIDE_5);
   }
   
   str2regex_simple(regex_str.as_str())

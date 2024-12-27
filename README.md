@@ -6,6 +6,7 @@ Deployer is a relative simple, yet powerful localhost CI/CD instrument. It allow
 - create actions and pipelines from TUI or JSON configuration files
 - configure actions for specific project
 - check compatibility over actions and projects
+- run pipelines with different cache requirements in different build folders
 - and share your project build/deploy settings very quickly and without any dependencies.
 
 ## Build

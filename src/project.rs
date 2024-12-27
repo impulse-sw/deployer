@@ -8,6 +8,7 @@ use crate::entities::{
   variables::Variable,
 };
 use crate::hmap;
+use crate::i18n;
 
 impl DeployerProjectOptions {
   pub(crate) fn init_from_prompt(&mut self, curr_dir: String) -> anyhow::Result<()> {
@@ -20,10 +21,10 @@ impl DeployerProjectOptions {
     } else {
       self.project_name.to_owned()
     };
-    self.project_name = Text::new("Enter the project's name:").with_initial_value(project_name_proposal.as_str()).prompt()?;
+    self.project_name = Text::new(i18n::PROJECT_NAME).with_initial_value(project_name_proposal.as_str()).prompt()?;
     
     self.cache_files.push(".git".to_string());
-    println!("Please, specify the project's programming languages to setup default cache folders.");
+    println!("{}", i18n::PROJECT_SPECIFY_PLS);
     self.langs = specify_programming_languages()?;
     for lang in &self.langs {
       match lang {
@@ -35,7 +36,7 @@ impl DeployerProjectOptions {
       }
     }
     
-    self.deploy_toolkit = Text::new("Specify your deploy toolkit (`docker`, `docker-compose`, `podman`, `k8s`, etc.) (or hit `esc`):").prompt_skippable()?;
+    self.deploy_toolkit = Text::new(&format!("{} {}:", i18n::PROJECT_DEPL_TOOLKIT, i18n::OR_HIT_ESC)).prompt_skippable()?;
     self.targets = collect_targets()?;
     self.variables = collect_variables()?;
     self.artifacts = collect_artifacts()?;
@@ -46,33 +47,35 @@ impl DeployerProjectOptions {
   
   pub(crate) fn edit_project_from_prompt(&mut self, globals: &mut DeployerGlobalConfig) -> anyhow::Result<()> {
     let actions = vec![
-      "Edit project Pipelines",
-      "Edit project name",
-      "Reassign project variables to Actions",
-      "Edit cache files",
-      "Edit programming languages",
-      "Edit targets",
-      "Edit deploy toolkit",
-      "Edit project variables",
-      "Edit artifacts",
-      "Edit artifact inplacements",
+      i18n::EDIT_PROJECT_PIPELINES,
+      i18n::EDIT_PROJECT_NAME,
+      i18n::EDIT_PROJECT_REASSIGN,
+      i18n::EDIT_CACHE,
+      i18n::EDIT_PLS,
+      i18n::EDIT_TARGETS,
+      i18n::EDIT_DEPL_TOOLKIT,
+      i18n::EDIT_PROJECT_VARS,
+      i18n::EDIT_ARTIFACTS,
+      i18n::EDIT_AF_INPLACE,
     ];
     
     while let Some(action) = inquire::Select::new(
-      "Select an edit action (hit `esc` when done):",
+      &format!("{} {}:", i18n::EDIT_ACTION_PROMPT, i18n::HIT_ESC),
       actions.clone(),
     ).prompt_skippable()? {
       match action {
-        "Edit project name" => self.project_name = inquire::Text::new("Enter the project's name:").prompt()?,
-        "Edit cache files" => self.cache_files.edit_from_prompt()?,
-        "Edit programming languages" => self.langs.edit_from_prompt()?,
-        "Edit targets" => self.targets.edit_from_prompt()?,
-        "Edit deploy toolkit" => self.deploy_toolkit = inquire::Text::new("Specify your deploy toolkit (or hit `esc`):").prompt_skippable()?,
-        "Edit project variables" => self.variables.edit_from_prompt()?,
-        "Edit artifacts" => self.artifacts.edit_from_prompt()?,
-        "Edit artifact inplacements" => self.inplace_artifacts_into_project_root.edit_from_prompt(&mut self.artifacts)?,
-        "Edit project Pipelines" => self.pipelines.edit_from_prompt(globals)?,
-        "Reassign project variables to Actions" => for pipeline in &mut self.pipelines {
+        i18n::EDIT_PROJECT_NAME => self.project_name = inquire::Text::new(i18n::PROJECT_NAME).prompt()?,
+        i18n::EDIT_CACHE => self.cache_files.edit_from_prompt()?,
+        i18n::EDIT_PLS => self.langs.edit_from_prompt()?,
+        i18n::EDIT_TARGETS => self.targets.edit_from_prompt()?,
+        i18n::EDIT_DEPL_TOOLKIT => self.deploy_toolkit = inquire::Text::new(
+          &format!("{} {}:", i18n::DEPL_TOOLKIT, i18n::OR_HIT_ESC)
+        ).prompt_skippable()?,
+        i18n::EDIT_PROJECT_VARS => self.variables.edit_from_prompt()?,
+        i18n::EDIT_ARTIFACTS => self.artifacts.edit_from_prompt()?,
+        i18n::EDIT_AF_INPLACE => self.inplace_artifacts_into_project_root.edit_from_prompt(&mut self.artifacts)?,
+        i18n::EDIT_PROJECT_PIPELINES => self.pipelines.edit_from_prompt(globals)?,
+        i18n::EDIT_PROJECT_REASSIGN => for pipeline in &mut self.pipelines {
           for action in &mut pipeline.actions {
             *action = action.prompt_setup_for_project(&self.langs, &self.deploy_toolkit, &self.targets, &self.variables, &self.artifacts)?;
           }
@@ -92,18 +95,18 @@ impl Edit for Vec<String> {
       let mut cs = vec![];
       
       self.iter_mut().for_each(|c| {
-        let s = format!("Entity `{}`", c.as_str());
+        let s = format!("{} `{}`", i18n::ENTITY, c.as_str());
         
         cmap.insert(s.clone(), c);
         cs.push(s);
       });
       
-      cs.extend_from_slice(&["Add".to_string(), "Remove".to_string()]);
+      cs.extend_from_slice(&[i18n::ADD.to_string(), i18n::REMOVE.to_string()]);
       
-      if let Some(action) = inquire::Select::new("Select an action (hit `esc` when done):", cs).prompt_skippable()? {
+      if let Some(action) = inquire::Select::new(&format!("{} {}:", i18n::EDIT_ACTION_PROMPT, i18n::HIT_ESC), cs).prompt_skippable()? {
         match action.as_str() {
-          "Add" => self.add_item()?,
-          "Remove" => self.remove_item()?,
+          i18n::ADD => self.add_item()?,
+          i18n::REMOVE => self.remove_item()?,
           _ => {},
         }
       } else { break }
@@ -115,7 +118,7 @@ impl Edit for Vec<String> {
   fn reorder(&mut self) -> anyhow::Result<()> { Ok(()) }
   
   fn add_item(&mut self) -> anyhow::Result<()> {
-    self.push(inquire::Text::new("Input new value:").prompt()?);
+    self.push(inquire::Text::new(i18n::NEW_VALUE).prompt()?);
     Ok(())
   }
   
@@ -124,13 +127,13 @@ impl Edit for Vec<String> {
     let mut cs = vec![];
     
     self.iter().for_each(|c| {
-      let s = format!("Entity `{}`", c.as_str());
+      let s = format!("{} `{}`", i18n::ENTITY, c.as_str());
       
       cmap.insert(s.clone(), c);
       cs.push(s);
     });
     
-    let selected = inquire::Select::new("Select a value to remove:", cs.clone()).prompt()?;
+    let selected = inquire::Select::new(i18n::VALUE_TO_REMOVE, cs.clone()).prompt()?;
     
     let mut commands = vec![];
     for key in cs {
@@ -150,18 +153,18 @@ impl EditExtended<Vec<String>> for Vec<(String, String)> {
       let mut cs = vec![];
       
       self.iter_mut().for_each(|c| {
-        let s = format!("Inplacement `{}` -> `{}`", c.0, c.1);
+        let s = format!("{} `{}` -> `{}`", i18n::INPLACEMENT, c.0, c.1);
         
         cmap.insert(s.clone(), c);
         cs.push(s);
       });
       
-      cs.extend_from_slice(&["Add".to_string(), "Remove".to_string()]);
+      cs.extend_from_slice(&[i18n::ADD.to_string(), i18n::REMOVE.to_string()]);
       
-      if let Some(action) = inquire::Select::new("Select an action (hit `esc` when done):", cs).prompt_skippable()? {
+      if let Some(action) = inquire::Select::new(&format!("{} {}:", i18n::EDIT_ACTION_PROMPT, i18n::HIT_ESC), cs).prompt_skippable()? {
         match action.as_str() {
-          "Add" => self.add_item(opts)?,
-          "Remove" => self.remove_item(opts)?,
+          i18n::ADD => self.add_item(opts)?,
+          i18n::REMOVE => self.remove_item(opts)?,
           _ => {},
         }
       } else { break }
@@ -174,8 +177,8 @@ impl EditExtended<Vec<String>> for Vec<(String, String)> {
   
   fn add_item(&mut self, opts: &mut Vec<String>) -> anyhow::Result<()> {
     self.push({
-      let from = inquire::Select::new("Select project's artifact:", opts.to_owned()).prompt()?;
-      let to = inquire::Text::new("Enter relative path of artifact inplacement (inside `artifacts` subfolder):").prompt()?;
+      let from = inquire::Select::new(i18n::SELECT_PROJECT_AF, opts.to_owned()).prompt()?;
+      let to = inquire::Text::new(i18n::CHOOSE_AF_INPLACEMENT).prompt()?;
       
       (from, to)
     });
@@ -187,13 +190,13 @@ impl EditExtended<Vec<String>> for Vec<(String, String)> {
     let mut cs = vec![];
     
     self.iter().for_each(|c| {
-      let s = format!("Inplacement `{}` -> `{}`", c.0, c.1);
+      let s = format!("{} `{}` -> `{}`", i18n::INPLACEMENT, c.0, c.1);
       
       cmap.insert(s.clone(), c);
       cs.push(s);
     });
     
-    let selected = inquire::Select::new("Select an inplacement to remove:", cs.clone()).prompt()?;
+    let selected = inquire::Select::new(i18n::REMOVE_INPLACEMENT, cs.clone()).prompt()?;
     
     let mut commands = vec![];
     for key in cs {
@@ -213,18 +216,21 @@ impl Edit for Vec<TargetDescription> {
       let mut cs = vec![];
       
       self.iter_mut().for_each(|c| {
-        let s = format!("Edit target `{}`", c.to_string().green());
+        let s = format!("{} `{}`", i18n::EDIT_TARGET, c.to_string().green());
         
         cmap.insert(s.clone(), c);
         cs.push(s);
       });
       
-      cs.extend_from_slice(&["Add target".to_string(), "Remove target".to_string()]);
+      cs.extend_from_slice(&[i18n::ADD.to_string(), i18n::REMOVE.to_string()]);
       
-      if let Some(action) = inquire::Select::new("Select a concrete target to change (hit `esc` when done):", cs).prompt_skippable()? {
+      if let Some(action) = inquire::Select::new(
+        &format!("{} {}:", i18n::SELECT_TARGET_TO_CHANGE, i18n::HIT_ESC),
+        cs,
+      ).prompt_skippable()? {
         match action.as_str() {
-          "Add target" => self.add_item()?,
-          "Remove target" => self.remove_item()?,
+          i18n::ADD => self.add_item()?,
+          i18n::REMOVE => self.remove_item()?,
           s if cmap.contains_key(s) => cmap.get_mut(s).unwrap().edit_target_from_prompt()?,
           _ => {},
         }
@@ -246,13 +252,13 @@ impl Edit for Vec<TargetDescription> {
     let mut cs = vec![];
     
     self.iter().for_each(|c| {
-      let s = format!("Target `{}`", c.to_string().green());
+      let s = format!("{} `{}`", i18n::TARGET, c.to_string().green());
       
       cmap.insert(s.clone(), c);
       cs.push(s);
     });
     
-    let selected = inquire::Select::new("Select a target to remove:", cs.clone()).prompt()?;
+    let selected = inquire::Select::new(i18n::SELECT_TARGET_TO_REMOVE, cs.clone()).prompt()?;
     
     let mut commands = vec![];
     for key in cs {
@@ -269,7 +275,7 @@ fn collect_targets() -> anyhow::Result<Vec<TargetDescription>> {
   let mut v = vec![];
   let mut first = true;
   
-  while inquire::Confirm::new("Add new build target?").with_default(first).prompt()? {
+  while inquire::Confirm::new(i18n::ADD_NEW_TARGET).with_default(first).prompt()? {
     v.push(TargetDescription::new_from_prompt()?);
     first = false;
   }
@@ -278,14 +284,14 @@ fn collect_targets() -> anyhow::Result<Vec<TargetDescription>> {
 }
 
 fn collect_artifact() -> anyhow::Result<String> {
-  Ok(inquire::Text::new("Enter the artifact's relative path:").prompt()?)
+  Ok(inquire::Text::new(i18n::AF_RELATIVE_PATH).prompt()?)
 }
 
 fn collect_artifacts() -> anyhow::Result<Vec<String>> {
   let mut v = vec![];
   let mut first = true;
   
-  while inquire::Confirm::new("Add new build/deploy artifact?").with_default(first).prompt()? {
+  while inquire::Confirm::new(i18n::ADD_NEW_AF).with_default(first).prompt()? {
     v.push(collect_artifact()?);
     first = false;
   }
@@ -297,7 +303,7 @@ fn collect_variables() -> anyhow::Result<Vec<Variable>> {
   let mut v = vec![];
   let mut first = true;
   
-  while inquire::Confirm::new("Add new project-related variable or secret?").with_default(first).prompt()? {
+  while inquire::Confirm::new(i18n::ADD_NEW_VAR).with_default(first).prompt()? {
     v.push(Variable::new_from_prompt()?);
     first = false;
   }
@@ -308,8 +314,8 @@ fn collect_variables() -> anyhow::Result<Vec<Variable>> {
 fn collect_af_inplacements(artifacts: &[String]) -> anyhow::Result<Vec<(String, String)>> {
   use inquire::{Confirm, Select, Text};
   
-  const FIRST_PROMPT: &str = "Do you want to create artifact inplacement from build directory to your project's location (inside `artifacts` subfolder)?";
-  const ANOTHER_PROMPT: &str = "Add one more artifact inplacement?";
+  const FIRST_PROMPT: &str = i18n::ADD_NEW_INPLACEMENT_FIRST;
+  const ANOTHER_PROMPT: &str = i18n::ADD_NEW_INPLACEMENT_SECOND;
   
   let mut v = vec![];
   let mut prompt = FIRST_PROMPT;
@@ -318,8 +324,8 @@ fn collect_af_inplacements(artifacts: &[String]) -> anyhow::Result<Vec<(String, 
   if artifacts.is_empty() { first = false; }
   
   while Confirm::new(prompt).with_default(first).prompt()? {
-    let from = Select::new("Select project's artifact:", artifacts.to_owned()).prompt()?;
-    let to = Text::new("Enter relative path of artifact inplacement (inside `artifacts` subfolder):").prompt()?;
+    let from = Select::new(i18n::SELECT_PROJECT_AF, artifacts.to_owned()).prompt()?;
+    let to = Text::new(i18n::CHOOSE_AF_INPLACEMENT).prompt()?;
     v.push((from, to));
     prompt = ANOTHER_PROMPT;
     first = false;
@@ -332,7 +338,7 @@ pub(crate) fn edit_project(
   globals: &mut DeployerGlobalConfig,
   config: &mut DeployerProjectOptions,
 ) -> anyhow::Result<()> {
-  if *config == Default::default() { panic!("Config is invalid! Reinit the project."); }
+  if *config == Default::default() { panic!("{}", i18n::CFG_INVALID); }
   
   config.edit_project_from_prompt(globals)?;
   Ok(())

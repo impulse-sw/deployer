@@ -1,6 +1,6 @@
 [package]
 name = "deployer"
-version = "0.1.1-beta-14"
+version = "0.2.0"
 edition = "2024"
 
 [dependencies]
@@ -19,5 +19,6 @@ strip-ansi-escapes = "0.2"
 uuid = { version = "1.11", features = ["v4", "fast-rng"] }
 
 [features]
-default = []
+default = ["i18n-ru"]
 tests = []
+i18n-ru = []

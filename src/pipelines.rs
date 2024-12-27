@@ -12,6 +12,7 @@ use crate::entities::{
   traits::{EditExtended, Execute},
 };
 use crate::hmap;
+use crate::i18n;
 use crate::rw::{read_checked, generate_build_log_filepath, build_log};
 use crate::utils::tags_custom_type;
 use crate::ARTIFACTS_DIR;
@@ -44,20 +45,20 @@ impl DescribedPipeline {
   pub(crate) fn new_from_prompt(globals: &mut DeployerGlobalConfig) -> anyhow::Result<Self> {
     use inquire::Text;
     
-    let short_name = Text::new("Write the Pipeline's short name:").prompt()?;
-    let version = Text::new("Specify the Pipeline's version:").prompt()?;
+    let short_name = Text::new(i18n::PIPELINE_SHORT_NAME).prompt()?;
+    let version = Text::new(i18n::PIPELINE_VERSION).prompt()?;
     
     let info = PipelineInfo { short_name, version };
     
-    let name = Text::new("Write the Pipeline's full name:").prompt()?;
-    let desc = Text::new("Write the Pipeline's description:").prompt()?;
+    let name = Text::new(i18n::PIPELINE_FULL_NAME).prompt()?;
+    let desc = Text::new(i18n::PIPELINE_DESC).prompt()?;
     
-    let tags: Vec<String> = tags_custom_type("Write Pipeline's tags, if any:", None).prompt()?;
+    let tags: Vec<String> = tags_custom_type(i18n::PIPELINE_TAGS, None).prompt()?;
     
     let selected_actions_unordered = collect_multiple_actions(globals)?;
     let selected_actions_ordered = reorder_actions(selected_actions_unordered)?;
     
-    let exclusive_exec_tag = Text::new("Specify exclusive pipeline tag (or hit `esc`):").prompt_skippable()?;
+    let exclusive_exec_tag = Text::new(&format!("{} {}:", i18n::PIPELINE_SPECIFY_EXCL_TAG, i18n::OR_HIT_ESC)).prompt_skippable()?;
     
     let described_pipeline = DescribedPipeline {
       title: name,
@@ -74,30 +75,30 @@ impl DescribedPipeline {
   
   pub(crate) fn edit_pipeline_from_prompt(&mut self, globals: &mut DeployerGlobalConfig) -> anyhow::Result<()> {
     let actions = vec![
-      "Edit Pipeline's Actions",
-      "Edit title",
-      "Edit description",
-      "Edit tags",
-      "Edit exclusive execution tag",
+      i18n::EDIT_PIPELINE_ACTIONS,
+      i18n::EDIT_TITLE,
+      i18n::EDIT_DESC,
+      i18n::EDIT_TAGS,
+      i18n::EDIT_EXCL_TAG,
     ];
     
     while let Some(action) = inquire::Select::new(
-      "Select an edit action (hit `esc` when done):",
+      &format!("{} {}:", i18n::EDIT_ACTION_PROMPT, i18n::HIT_ESC),
       actions.clone(),
     ).prompt_skippable()? {
       match action {
-        "Edit title" => self.title = inquire::Text::new("Write the Action's full name:").with_initial_value(self.title.as_str()).prompt()?,
-        "Edit description" => self.desc = inquire::Text::new("Write the Action's description:").with_initial_value(self.desc.as_str()).prompt()?,
-        "Edit tags" => {
+        i18n::EDIT_TITLE => self.title = inquire::Text::new(i18n::PIPELINE_FULL_NAME).with_initial_value(self.title.as_str()).prompt()?,
+        i18n::EDIT_DESC => self.desc = inquire::Text::new(i18n::PIPELINE_DESC).with_initial_value(self.desc.as_str()).prompt()?,
+        i18n::EDIT_TAGS => {
           let joined = self.tags.join(", ");
-          self.tags = tags_custom_type("Write Action's tags, if any:", if joined.is_empty() { None } else { Some(joined.as_str()) }).prompt()?
+          self.tags = tags_custom_type(i18n::PIPELINE_TAGS, if joined.is_empty() { None } else { Some(joined.as_str()) }).prompt()?
         },
-        "Edit Pipeline's Actions" => self.actions.edit_from_prompt(globals)?,
-        "Edit exclusive execution tag" => self.exclusive_exec_tag = if self.exclusive_exec_tag.is_none() {
-          inquire::Text::new("Specify exclusive pipeline tag (or hit `esc`):").prompt_skippable()?
+        i18n::EDIT_PIPELINE_ACTIONS => self.actions.edit_from_prompt(globals)?,
+        i18n::EDIT_EXCL_TAG => self.exclusive_exec_tag = if self.exclusive_exec_tag.is_none() {
+          inquire::Text::new(&format!("{} {}:", i18n::PIPELINE_SPECIFY_EXCL_TAG, i18n::OR_HIT_ESC)).prompt_skippable()?
         } else {
           inquire::Text::new(
-            "Specify exclusive pipeline tag (or hit `esc`):"
+            &format!("{} {}:", i18n::PIPELINE_SPECIFY_EXCL_TAG, i18n::OR_HIT_ESC)
           ).with_initial_value(self.exclusive_exec_tag.as_ref().unwrap()).prompt_skippable()?
         },
         _ => {},
@@ -112,7 +113,7 @@ impl DescribedPipeline {
 pub(crate) fn list_pipelines(
   globals: &DeployerGlobalConfig,
 ) -> anyhow::Result<()> {
-  println!("Available Pipelines in Deployer's Registry:");
+  println!("{}", i18n::PIPELINES_AVAILABLE);
   
   let mut pipelines = globals.pipelines_registry.values().collect::<Vec<_>>();
   pipelines.sort_by_key(|a| info2str_simple(&a.info));
@@ -120,7 +121,7 @@ pub(crate) fn list_pipelines(
   for pipeline in pipelines {
     let pipeline_info = format!("{}@{}", pipeline.info.short_name, pipeline.info.version);
     let pipeline_title = format!("[{}]", pipeline.title);
-    let tags = if pipeline.tags.is_empty() { String::new() } else { format!(" (tags: {})", pipeline.tags.join(", ").as_str().blue().italic()) };
+    let tags = if pipeline.tags.is_empty() { String::new() } else { format!(" ({}: {})", i18n::TAGS, pipeline.tags.join(", ").as_str().blue().italic()) };
     println!("• {} {}{}", pipeline_info.blue().bold(), pipeline_title.green().bold(), tags);
     if !pipeline.desc.is_empty() { println!("\t> {}", pipeline.desc.green().italic()); }
   }
@@ -145,9 +146,7 @@ pub(crate) fn new_pipeline(
   
   if
     globals.pipelines_registry.contains_key(&info2str_simple(&described_pipeline.info)) &&
-    !inquire::Confirm::new(&format!(
-      "Pipelines Registry already have `{}` Pipeline. Do you want to override it? (y/n)", info2str_simple(&described_pipeline.info))
-    ).prompt()?
+    !inquire::Confirm::new(&i18n::PIPELINE_REG_ALREADY_HAVE.replace("{}", &info2str_simple(&described_pipeline.info))).prompt()?
   {
     return Ok(())
   }
@@ -171,7 +170,7 @@ fn reorder_actions(
     h.insert(key, selected_action);
   }
   
-  let reordered = ReorderableList::new("Reorder Pipeline's Actions:", k).prompt()?;
+  let reordered = ReorderableList::new(i18n::REORDER_PIPELINE_ACTIONS, k).prompt()?;
   
   let mut selected_actions_ordered = vec![];
   for key in reordered {
@@ -186,7 +185,7 @@ fn select_action(
 ) -> anyhow::Result<DescribedAction> {
   use inquire::{Select, Text};
   
-  const NEW_ACTION: &str = "Create new Action";
+  const NEW_ACTION: &str = i18n::ACTION_SPECIFY_ANOTHER;
   
   let (actions, keys) = {
     let mut h = hmap!();
@@ -205,12 +204,12 @@ fn select_action(
     (h, k)
   };
   
-  let selected_action = Select::new("Select Action for adding to Pipeline:", keys).prompt()?;
+  let selected_action = Select::new(i18n::SELECT_ACTION_TO_ADD_TO, keys).prompt()?;
   
   if selected_action.as_str().eq(NEW_ACTION) {
     let mut action = new_action(globals, &NewActionArgs { from: None })?;
-    let new_title = Text::new("Describe this Action inside your Pipeline:").prompt()?;
-    action.desc = format!(r#"Got from `{}`. {}"#, action.title, action.desc);
+    let new_title = Text::new(i18n::PIPELINE_DESCRIBE_ACTION_IN).prompt()?;
+    action.desc = format!(r#"{} `{}`.{}{}"#, i18n::GOT_FROM, action.title, if action.desc.is_empty() { "" } else { " " }, action.desc);
     action.title = new_title;
     
     return Ok(action)
@@ -218,8 +217,8 @@ fn select_action(
   
   let mut action = (*actions.get(&selected_action).unwrap()).clone();
   
-  let new_title = Text::new("Describe this Action inside your Pipeline:").prompt()?;
-  action.desc = format!(r#"Got from `{}`. {}"#, action.title, action.desc);
+  let new_title = Text::new(i18n::PIPELINE_DESCRIBE_ACTION_IN).prompt()?;
+  action.desc = format!(r#"{} `{}`.{}{}"#, i18n::GOT_FROM, action.title, if action.desc.is_empty() { "" } else { " " }, action.desc);
   action.title = new_title;
   
   Ok(action)
@@ -234,7 +233,7 @@ fn collect_multiple_actions(
   let mut actions = Vec::new();
   let mut first = true;
   
-  while Confirm::new("Add Action?").with_default(first).prompt()? {
+  while Confirm::new(i18n::ACTION_ADD).with_default(first).prompt()? {
     actions.push(select_action(globals)?);
     first = false;
   }
@@ -247,7 +246,7 @@ pub(crate) fn remove_pipeline(
   use inquire::{Select, Confirm};
   
   if globals.pipelines_registry.is_empty() {
-    println!("There is no Pipelines in Registry.");
+    println!("{}", i18n::NO_PIPELINES);
     return Ok(())
   }
   
@@ -267,10 +266,10 @@ pub(crate) fn remove_pipeline(
     (h, k)
   };
   
-  let selected_pipeline = Select::new("Select Pipeline for removing from Pipeline's Registry:", keys).prompt()?;
+  let selected_pipeline = Select::new(i18n::PIPELINE_REGISTRY_CHOOSE_TO_REMOVE, keys).prompt()?;
   let pipeline = *pipelines.get(&selected_pipeline).unwrap();
   
-  if !Confirm::new("Are you sure? (y/n)").prompt()? { return Ok(()) }
+  if !Confirm::new(i18n::ARE_YOU_SURE).prompt()? { return Ok(()) }
   
   globals.pipelines_registry.remove(&info2str_simple(&pipeline.info));
   
@@ -296,8 +295,8 @@ pub(crate) fn cat_project_pipelines(
   config: &DeployerProjectOptions,
 ) -> anyhow::Result<()> {
   for pipeline in &config.pipelines {
-    let pipeline_yaml = serde_json::to_string_pretty(&pipeline).unwrap();
-    println!("{}", pipeline_yaml);
+    let pipeline_json = serde_json::to_string_pretty(&pipeline).unwrap();
+    println!("{}", pipeline_json);
   }
   
   Ok(())
@@ -317,8 +316,7 @@ fn reorder_pipelines_in_project(
     h.insert(key, pipeline);
   }
   
-  println!("The `build` action without specifying Pipeline's short name will execute all Pipelines. Make sure that your Pipelines are sorted the way you need them.");
-  let reordered = ReorderableList::new("Reorder Pipelines inside your project:", k).prompt()?;
+  let reordered = ReorderableList::new(i18n::PIPELINES_REORDER, k).prompt()?;
   
   let mut pipelines_ordered = vec![];
   for key in reordered {
@@ -333,16 +331,16 @@ pub(crate) fn assign_pipeline_to_project(
   config: &mut DeployerProjectOptions,
   args: &WithPipelineArgs,
 ) -> anyhow::Result<()> {
-  if *config == Default::default() { panic!("Config is invalid! Reinit the project."); }
+  if *config == Default::default() { panic!("{}", i18n::CFG_INVALID); }
   
   let mut pipeline = if let Some(tag) = &args.tag {
     globals
       .pipelines_registry
       .get(tag)
-      .ok_or_else(|| anyhow::anyhow!("There is no such Pipeline in Registry. See available Pipelines with `deployer ls pipelines`."))?
+      .ok_or_else(|| anyhow::anyhow!(i18n::NO_SUCH_PIPELINE))?
       .clone()
   } else if !globals.pipelines_registry.is_empty() {
-    const NEW_PIPELINE: &str = "· Specify another Pipeline";
+    const NEW_PIPELINE: &str = i18n::PIPELINE_SPECIFY_ANOTHER;
     
     let mut ptags = hmap!();
     let mut tags = vec![];
@@ -354,14 +352,14 @@ pub(crate) fn assign_pipeline_to_project(
       .for_each(|(t, p)| { tags.push(t.clone()); ptags.insert(t, p); });
     tags.push(NEW_PIPELINE.to_string());
     
-    let selected = inquire::Select::new("Select the Pipeline for this project:", tags).prompt()?;
+    let selected = inquire::Select::new(i18n::PIPELINE_SELECT_FOR_PROJECT, tags).prompt()?;
     
     if selected.as_str() == NEW_PIPELINE {
       DescribedPipeline::new_from_prompt(globals)?
     } else {
       let pipeline = ptags
         .get(&selected)
-        .ok_or(anyhow::anyhow!("There is no such Pipeline in Registry. See available Pipelines with `deployer ls pipelines`."))?;
+        .ok_or(anyhow::anyhow!(i18n::NO_SUCH_PIPELINE))?;
       (*pipeline).clone()
     }
   } else {
@@ -375,23 +373,20 @@ pub(crate) fn assign_pipeline_to_project(
   let short_name = if let Some(short_name) = args.r#as.as_ref() {
     short_name.to_owned()
   } else {
-    inquire::Text::new("Write the Pipeline's short name (only for this project):").prompt()?
+    inquire::Text::new(i18n::PIPELINE_SHORT_NAME_FOR_PROJECT).prompt()?
   };
   
-  pipeline.desc = format!(r#"Got from `{}`. {}"#, pipeline.title, pipeline.desc);
+  pipeline.desc = format!(r#"{} `{}`.{}{}"#, i18n::GOT_FROM, pipeline.title, if pipeline.desc.is_empty() { "" } else { " " }, pipeline.desc);
   pipeline.title = short_name.clone();
   
   if specify_short_name(config, &mut pipeline.title).is_err() { return Ok(()) };
   
   if let Some(old_default) = config.pipelines.iter_mut().find(|p| p.default.is_some_and(|v| v)) {
-    if inquire::Confirm::new(&format!(
-      "Pipeline `{}` is already set by default. Set this Pipeline running by default instead?",
-      old_default.title.as_str()
-    )).prompt()? {
+    if inquire::Confirm::new(&i18n::PIPELINE_NEW_DEFAULT_REPLACE.replace("{}", old_default.title.as_str())).prompt()? {
       old_default.default = None;
       pipeline.default = Some(true);
     }
-  } else if inquire::Confirm::new("Set this Pipeline running by default? (y/n)").prompt()? {
+  } else if inquire::Confirm::new(i18n::PIPELINE_NEW_DEFAULT).prompt()? {
     pipeline.default = Some(true);
   }
   
@@ -402,7 +397,7 @@ pub(crate) fn assign_pipeline_to_project(
     config.pipelines = reorder_pipelines_in_project(config.pipelines.clone())?;
   }
   
-  println!("Pipeline is successfully set up for this project.");
+  println!("{}", i18n::PIPELINE_DEFAULT_SET);
   
   Ok(())
 }
@@ -413,9 +408,9 @@ fn specify_short_name(
 ) -> anyhow::Result<()> {
   while
     config.pipelines.iter().any(|p| p.title.as_str() == short_name) &&
-    !inquire::Confirm::new(&format!("Do you want to overwrite an existing pipeline `{}` for this project? (y/n)", short_name.as_str())).prompt()?
+    !inquire::Confirm::new(&i18n::PIPELINE_SHORT_NAME_FOR_PROJECT_OVERRIDE.replace("{}", short_name.as_str())).prompt()?
   {
-    *short_name = inquire::Text::new("Write the Pipeline's short name (only for this project) (or hit `esc` to exit):")
+    *short_name = inquire::Text::new(&format!("{} {}:", i18n::PIPELINE_SHORT_NAME_FOR_PROJECT, i18n::HIT_ESC))
       .prompt_skippable()?
       .ok_or_else(|| anyhow::anyhow!("Hitted Escape."))?;
   }
@@ -458,19 +453,19 @@ impl EditExtended<DeployerGlobalConfig> for Vec<DescribedPipeline> {
       let mut cs = vec![];
       
       self.iter_mut().for_each(|c| {
-        let s = format!("Edit Pipeline `{}` - `{}`", c.title, info2str_simple(&c.info));
+        let s = i18n::PIPELINE_EDIT.replace("{1}", &c.title).replace("{2}", &info2str_simple(&c.info));
         
         cmap.insert(s.clone(), c);
         cs.push(s);
       });
       
-      cs.extend_from_slice(&["Reorder Pipelines".to_string(), "Add Pipeline".to_string(), "Remove Pipeline".to_string()]);
+      cs.extend_from_slice(&[i18n::REORDER.to_string(), i18n::ADD.to_string(), i18n::REMOVE.to_string()]);
       
-      if let Some(action) = inquire::Select::new("Select a concrete Pipeline to change (hit `esc` when done):", cs).prompt_skippable()? {
+      if let Some(action) = inquire::Select::new(&format!("{} {}:", i18n::SELECT_PIPELINE_TO_CHANGE, i18n::HIT_ESC), cs).prompt_skippable()? {
         match action.as_str() {
-          "Reorder Pipelines" => self.reorder(opts)?,
-          "Add Pipeline" => self.add_item(opts)?,
-          "Remove Pipeline" => self.remove_item(opts)?,
+          i18n::REORDER => self.reorder(opts)?,
+          i18n::ADD => self.add_item(opts)?,
+          i18n::REMOVE => self.remove_item(opts)?,
           s if cmap.contains_key(s) => cmap.get_mut(s).unwrap().edit_pipeline_from_prompt(opts)?,
           _ => {},
         }
@@ -487,12 +482,12 @@ impl EditExtended<DeployerGlobalConfig> for Vec<DescribedPipeline> {
     let mut k = vec![];
     
     for selected in self.iter() {
-      let key = format!("Pipeline `{}` - `{}`", selected.title, info2str_simple(&selected.info));
+      let key = i18n::PIPELINE.replace("{1}", &selected.title).replace("{2}", &info2str_simple(&selected.info));
       k.push(key.clone());
       h.insert(key, selected);
     }
     
-    let reordered = ReorderableList::new("Reorder Pipeline's Actions:", k).prompt()?;
+    let reordered = ReorderableList::new(i18n::PIPELINE_REORDER_ACTIONS, k).prompt()?;
     
     let mut selected_commands_ordered = vec![];
     for key in reordered {
@@ -507,20 +502,20 @@ impl EditExtended<DeployerGlobalConfig> for Vec<DescribedPipeline> {
   fn add_item(&mut self, opts: &mut DeployerGlobalConfig) -> anyhow::Result<()> {
     use inquire::Select;
     
-    const USE_ANOTHER: &str = "· Specify another Pipeline";
+    const USE_ANOTHER: &str = i18n::PIPELINE_SPECIFY_ANOTHER;
     
     let mut h = hmap!();
     let mut k = vec![];
     
     for pipeline in opts.pipelines_registry.values() {
-      let key = format!("Pipeline `{}` - `{}`", pipeline.title, info2str_simple(&pipeline.info));
+      let key = i18n::PIPELINE.replace("{1}", &pipeline.title).replace("{2}", &info2str_simple(&pipeline.info));
       k.push(key.clone());
       h.insert(key, pipeline);
     }
     
     k.push(USE_ANOTHER.to_string());
     
-    let selected = Select::new("Choose a Pipeline to add:", k).prompt()?;
+    let selected = Select::new(i18n::PIPELINE_CHOOSE_TO_ADD, k).prompt()?;
     
     if selected.as_str() == USE_ANOTHER {
       if let Ok(pipeline) = DescribedPipeline::new_from_prompt(opts) {
@@ -537,13 +532,13 @@ impl EditExtended<DeployerGlobalConfig> for Vec<DescribedPipeline> {
     let mut cs = vec![];
     
     self.iter().for_each(|c| {
-      let s = format!("Remove Pipeline `{}` - `{}`", c.title, info2str_simple(&c.info));
+      let s = i18n::PIPELINE_REMOVE.replace("{1}", &c.title).replace("{2}", &info2str_simple(&c.info));
       
       cmap.insert(s.clone(), c);
       cs.push(s);
     });
     
-    let selected = inquire::Select::new("Select an Pipeline to remove:", cs.clone()).prompt()?;
+    let selected = inquire::Select::new(i18n::PIPELINE_CHOOSE_TO_REMOVE, cs.clone()).prompt()?;
     
     let mut commands = vec![];
     for key in cs {
@@ -571,7 +566,7 @@ pub(crate) fn execute_pipeline(
     env.cache_dir,
   );
   
-  if !env.silent_build { println!("Starting the `{}` Pipeline...", pipeline.title); }
+  if !env.silent_build { println!("{}", i18n::STARTING_PIPELINE.replace("{}", &pipeline.title)); }
   build_log(&log_file, &[format!("Starting the `{}` Pipeline...", pipeline.title)])?;
   
   let mut cntr = 1usize;
@@ -579,11 +574,11 @@ pub(crate) fn execute_pipeline(
   for action in &pipeline.actions {
     if !env.silent_build {
       if !env.no_pipe {
-        print!("[{}/{}] `{}` Action... ", cntr, total, action.title.blue().italic());
+        print!("[{}/{}] {} `{}`...", cntr, total, i18n::STARTING_ACTION, action.title.blue().italic());
       } else {
-        println!("[{}/{}] `{}` Action... ", cntr, total, action.title.blue().italic());
+        println!("[{}/{}] {} `{}`...", cntr, total, i18n::STARTING_ACTION, action.title.blue().italic());
       }
-      build_log(&log_file, &[format!("[{}/{}] `{}` Action... ", cntr, total, action.title)])?;
+      build_log(&log_file, &[format!("[{}/{}] {} `{}`...", cntr, total, i18n::STARTING_ACTION, action.title)])?;
     }
     stdout().flush()?;
     let now = Instant::now();
@@ -604,25 +599,32 @@ pub(crate) fn execute_pipeline(
         modified_env.artifacts_dir = &artifacts_dir;
         enplace_artifacts(config, modified_env, false)?;
         
-        (true, vec!["Artifacts are enplaced successfully.".into()])
+        (true, vec![i18n::ARTIFACTS_ENPLACED.into()])
       },
       Action::Interrupt => {
         println!();
-        inquire::Confirm::new("The Pipeline is interrupted. Click `Enter` to continue").with_default(true).prompt()?;
+        inquire::Confirm::new(i18n::INTERRUPT).with_default(true).prompt()?;
         (true, vec![])
       },
       
     };
     
     let status_str = match status {
-      true => "done".to_string(),
-      false => "got an error!".red().bold().to_string(),
+      true => i18n::DONE.to_string(),
+      false => i18n::GOT_ERROR.red().bold().to_string(),
     };
     
     let elapsed = now.elapsed();
     if !env.no_pipe { build_log(&log_file, &output)?; }
     build_log(&log_file, &[
-      format!("[{}/{}] `{}` Action - {} ({:.2?}).", cntr, total, action.title, if status { "done" } else { "got an error!" }, elapsed),
+      format!(
+        "[{}/{}] {} -{} ({:.2?}).",
+        cntr,
+        total,
+        i18n::STARTING_ACTION.replace("{}", &action.title),
+        if status { i18n::DONE } else { i18n::GOT_ERROR },
+        elapsed,
+      ),
     ])?;
     
     if !env.silent_build {
@@ -630,7 +632,7 @@ pub(crate) fn execute_pipeline(
         println!("{} ({}).", status_str, format!("{:.2?}", elapsed).green());
         for line in output { println!("{}", line); }
       } else {
-        println!("[{}/{}] `{}` Action - {} ({}).", cntr, total, action.title.blue().italic(), status_str, format!("{:.2?}", elapsed).green());
+        println!("[{}/{}] {} -{} ({}).", cntr, total, i18n::STARTING_ACTION.replace("{}", &action.title.blue().italic()), status_str, format!("{:.2?}", elapsed).green());
       }
     }
     
@@ -641,8 +643,8 @@ pub(crate) fn execute_pipeline(
   
   let canonicalized = env.build_dir.canonicalize()?;
   let canonicalized = canonicalized.to_str().expect("Can't convert `Path` to string!");
-  if !env.silent_build { println!("Build path: {}", canonicalized); }
-  build_log(&log_file, &[format!("Build path: {}", canonicalized)])?;
+  if !env.silent_build { println!("{}: {}", i18n::BUILD_PATH, canonicalized); }
+  build_log(&log_file, &[format!("{}: {}", i18n::BUILD_PATH, canonicalized)])?;
   
   Ok(())
 }
