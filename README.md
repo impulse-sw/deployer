@@ -22,7 +22,8 @@ After installation, execute this:
 ```bash
 git clone https://github.com/impulse-sw/deployer.git
 cd deployer
-cargo install --path .
+cargo install --path . --no-default-features  # to install English version
+cargo install --path .                        # to install Russian version
 ```
 
 That's it! Now you have `/home/username/.cargo/bin/deployer` binary. Modify the `PATH` variable, if you need to.
