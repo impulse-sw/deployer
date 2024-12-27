@@ -242,3 +242,20 @@ tr!(ENTITY, "Entity");
 tr!(NEW_VALUE, "Input new value:");
 tr!(VALUE_TO_REMOVE, "Select a value to remove:");
 tr!(INPLACEMENT, "Inplacement");
+
+tr!(SELECT_PROJECT_AF, "Select project's artifact:");
+tr!(CHOOSE_AF_INPLACEMENT, "Enter relative path of artifact inplacement (inside `artifacts` subfolder):");
+tr!(REMOVE_INPLACEMENT, "Select an inplacement to remove:");
+tr!(TARGET, "Target");
+tr!(EDIT_TARGET, "Edit target");
+tr!(SELECT_TARGET_TO_CHANGE, "Select a concrete target to change");
+tr!(SELECT_TARGET_TO_REMOVE, "Select a target to remove:");
+tr!(ADD_NEW_TARGET, "Add new build target?");
+
+tr!(AF_RELATIVE_PATH, "Enter the artifact's relative path:");
+tr!(ADD_NEW_AF, "Add new build/deploy artifact?");
+tr!(ADD_NEW_VAR, "Add new project-related variable or secret?");
+tr!(ADD_NEW_INPLACEMENT_FIRST, "Do you want to create artifact inplacement from build directory to your project's location (inside `artifacts` subfolder)?");
+tr!(ADD_NEW_INPLACEMENT_SECOND, "Add one more artifact inplacement?");
+
+tr!(INIT_SUCC, "Setup is completed. Don't forget to assign at least one Pipeline to the project to build/deploy!");

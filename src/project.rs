@@ -177,8 +177,8 @@ impl EditExtended<Vec<String>> for Vec<(String, String)> {
   
   fn add_item(&mut self, opts: &mut Vec<String>) -> anyhow::Result<()> {
     self.push({
-      let from = inquire::Select::new("Select project's artifact:", opts.to_owned()).prompt()?;
-      let to = inquire::Text::new("Enter relative path of artifact inplacement (inside `artifacts` subfolder):").prompt()?;
+      let from = inquire::Select::new(i18n::SELECT_PROJECT_AF, opts.to_owned()).prompt()?;
+      let to = inquire::Text::new(i18n::CHOOSE_AF_INPLACEMENT).prompt()?;
       
       (from, to)
     });
@@ -196,7 +196,7 @@ impl EditExtended<Vec<String>> for Vec<(String, String)> {
       cs.push(s);
     });
     
-    let selected = inquire::Select::new("Select an inplacement to remove:", cs.clone()).prompt()?;
+    let selected = inquire::Select::new(i18n::REMOVE_INPLACEMENT, cs.clone()).prompt()?;
     
     let mut commands = vec![];
     for key in cs {
@@ -216,7 +216,7 @@ impl Edit for Vec<TargetDescription> {
       let mut cs = vec![];
       
       self.iter_mut().for_each(|c| {
-        let s = format!("Edit target `{}`", c.to_string().green());
+        let s = format!("{} `{}`", i18n::EDIT_TARGET, c.to_string().green());
         
         cmap.insert(s.clone(), c);
         cs.push(s);
@@ -224,7 +224,10 @@ impl Edit for Vec<TargetDescription> {
       
       cs.extend_from_slice(&[i18n::ADD.to_string(), i18n::REMOVE.to_string()]);
       
-      if let Some(action) = inquire::Select::new("Select a concrete target to change (hit `esc` when done):", cs).prompt_skippable()? {
+      if let Some(action) = inquire::Select::new(
+        &format!("{} {}:", i18n::SELECT_TARGET_TO_CHANGE, i18n::HIT_ESC),
+        cs,
+      ).prompt_skippable()? {
         match action.as_str() {
           i18n::ADD => self.add_item()?,
           i18n::REMOVE => self.remove_item()?,
@@ -249,13 +252,13 @@ impl Edit for Vec<TargetDescription> {
     let mut cs = vec![];
     
     self.iter().for_each(|c| {
-      let s = format!("Target `{}`", c.to_string().green());
+      let s = format!("{} `{}`", i18n::TARGET, c.to_string().green());
       
       cmap.insert(s.clone(), c);
       cs.push(s);
     });
     
-    let selected = inquire::Select::new("Select a target to remove:", cs.clone()).prompt()?;
+    let selected = inquire::Select::new(i18n::SELECT_TARGET_TO_REMOVE, cs.clone()).prompt()?;
     
     let mut commands = vec![];
     for key in cs {
@@ -272,7 +275,7 @@ fn collect_targets() -> anyhow::Result<Vec<TargetDescription>> {
   let mut v = vec![];
   let mut first = true;
   
-  while inquire::Confirm::new("Add new build target?").with_default(first).prompt()? {
+  while inquire::Confirm::new(i18n::ADD_NEW_TARGET).with_default(first).prompt()? {
     v.push(TargetDescription::new_from_prompt()?);
     first = false;
   }
@@ -281,14 +284,14 @@ fn collect_targets() -> anyhow::Result<Vec<TargetDescription>> {
 }
 
 fn collect_artifact() -> anyhow::Result<String> {
-  Ok(inquire::Text::new("Enter the artifact's relative path:").prompt()?)
+  Ok(inquire::Text::new(i18n::AF_RELATIVE_PATH).prompt()?)
 }
 
 fn collect_artifacts() -> anyhow::Result<Vec<String>> {
   let mut v = vec![];
   let mut first = true;
   
-  while inquire::Confirm::new("Add new build/deploy artifact?").with_default(first).prompt()? {
+  while inquire::Confirm::new(i18n::ADD_NEW_AF).with_default(first).prompt()? {
     v.push(collect_artifact()?);
     first = false;
   }
@@ -300,7 +303,7 @@ fn collect_variables() -> anyhow::Result<Vec<Variable>> {
   let mut v = vec![];
   let mut first = true;
   
-  while inquire::Confirm::new("Add new project-related variable or secret?").with_default(first).prompt()? {
+  while inquire::Confirm::new(i18n::ADD_NEW_VAR).with_default(first).prompt()? {
     v.push(Variable::new_from_prompt()?);
     first = false;
   }
@@ -311,8 +314,8 @@ fn collect_variables() -> anyhow::Result<Vec<Variable>> {
 fn collect_af_inplacements(artifacts: &[String]) -> anyhow::Result<Vec<(String, String)>> {
   use inquire::{Confirm, Select, Text};
   
-  const FIRST_PROMPT: &str = "Do you want to create artifact inplacement from build directory to your project's location (inside `artifacts` subfolder)?";
-  const ANOTHER_PROMPT: &str = "Add one more artifact inplacement?";
+  const FIRST_PROMPT: &str = i18n::ADD_NEW_INPLACEMENT_FIRST;
+  const ANOTHER_PROMPT: &str = i18n::ADD_NEW_INPLACEMENT_SECOND;
   
   let mut v = vec![];
   let mut prompt = FIRST_PROMPT;
@@ -321,8 +324,8 @@ fn collect_af_inplacements(artifacts: &[String]) -> anyhow::Result<Vec<(String, 
   if artifacts.is_empty() { first = false; }
   
   while Confirm::new(prompt).with_default(first).prompt()? {
-    let from = Select::new("Select project's artifact:", artifacts.to_owned()).prompt()?;
-    let to = Text::new("Enter relative path of artifact inplacement (inside `artifacts` subfolder):").prompt()?;
+    let from = Select::new(i18n::SELECT_PROJECT_AF, artifacts.to_owned()).prompt()?;
+    let to = Text::new(i18n::CHOOSE_AF_INPLACEMENT).prompt()?;
     v.push((from, to));
     prompt = ANOTHER_PROMPT;
     first = false;

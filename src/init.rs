@@ -1,5 +1,6 @@
 use crate::cmd::InitArgs;
 use crate::configs::{DeployerGlobalConfig, DeployerProjectOptions};
+use crate::i18n;
 
 pub(crate) fn init(
   globals: &mut DeployerGlobalConfig,
@@ -11,7 +12,7 @@ pub(crate) fn init(
   
   config.init_from_prompt(curr_dir)?;
   
-  println!("Setup is completed. Don't forget to assign at least one Pipeline to the project to build/deploy!");
+  println!("{}", i18n::INIT_SUCC);
   
   Ok(())
 }
