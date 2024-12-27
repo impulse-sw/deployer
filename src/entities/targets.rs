@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::i18n;
+
 #[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub(crate) struct TargetDescription {
   pub(crate) arch: String,
@@ -34,10 +36,10 @@ impl TargetDescription {
   pub(crate) fn new_from_prompt() -> anyhow::Result<Self> {
     use inquire::{Select, Text};
     
-    let arch = Text::new("Enter the target's architecture:").prompt()?;
+    let arch = Text::new(i18n::TARGET_ARCH).prompt()?;
     
     let os = Select::new(
-      "Select OS:",
+      i18n::TARGET_OS_SELECT,
       vec!["Android", "iOS", "Linux", "Unix-like", "Windows", "macOS", "Other"]
     ).prompt()?;
     
@@ -46,33 +48,33 @@ impl TargetDescription {
       "iOS" => OsVariant::iOS,
       "Linux" => OsVariant::Linux,
       "Unix-like" => {
-        let name = Text::new("Enter Unix-like OS name:").prompt()?;
+        let name = Text::new(i18n::TARGET_OS_UNIX_LIKE).prompt()?;
         OsVariant::UnixLike(name)
       },
       "Windows" => OsVariant::Windows,
       "macOS" => OsVariant::macOS,
       "Other" => {
-        let name = Text::new("Enter OS name:").prompt()?;
+        let name = Text::new(i18n::TARGET_OS_OTHER).prompt()?;
         OsVariant::Other(name)
       },
       _ => unreachable!(),
     };
     
-    let derivative = Text::new("Enter OS derivative:").prompt()?;
+    let derivative = Text::new(i18n::TARGET_OS_DER).prompt()?;
     
     let version_type = Select::new(
-      "Select version specification type:",
-      vec!["Not Specified", "Weak Specified", "Strong Specified"]
+      i18n::TARGET_OS_VER_S,
+      vec![i18n::TARGET_OS_VER_NS, i18n::TARGET_OS_VER_WS, i18n::TARGET_OS_VER_SS]
     ).prompt()?;
     
     let version = match version_type {
-      "Not Specified" => OsVersionSpecification::No,
-      "Weak Specified" => {
-        let ver = Text::new("Enter version:").prompt()?;
+      i18n::TARGET_OS_VER_NS => OsVersionSpecification::No,
+      i18n::TARGET_OS_VER_WS => {
+        let ver = Text::new(i18n::TARGET_OS_VER).prompt()?;
         OsVersionSpecification::Weak(ver)
       },
-      "Strong Specified" => {
-        let ver = Text::new("Enter version:").prompt()?;
+      i18n::TARGET_OS_VER_SS => {
+        let ver = Text::new(i18n::TARGET_OS_VER).prompt()?;
         OsVersionSpecification::Strong(ver)
       },
       _ => unreachable!(),
@@ -88,21 +90,21 @@ impl TargetDescription {
   
   pub(crate) fn edit_target_from_prompt(&mut self) -> anyhow::Result<()> {
     let actions = vec![
-      "Edit arch",
-      "Edit OS",
+      i18n::EDIT_ARCH,
+      i18n::EDIT_OS,
     ];
     
     while let Some(action) = inquire::Select::new(
-      "Select an edit action (hit `esc` when done):",
+      &format!("{} {}:", i18n::EDIT_ACTION_PROMPT, i18n::HIT_ESC),
       actions.clone(),
     ).prompt_skippable()? {
       use inquire::{Select, Text};
       
       match action {
-        "Edit arch" => self.arch = Text::new("Enter the target's architecture:").prompt()?,
-        "Edit OS" => {
+        i18n::EDIT_ARCH => self.arch = Text::new(i18n::TARGET_ARCH).prompt()?,
+        i18n::EDIT_OS => {
           let os = Select::new(
-            "Select OS:",
+            i18n::TARGET_OS_SELECT,
             vec!["Android", "iOS", "Linux", "Unix-like", "Windows", "macOS", "Other"]
           ).prompt()?;
           
@@ -111,33 +113,33 @@ impl TargetDescription {
             "iOS" => OsVariant::iOS,
             "Linux" => OsVariant::Linux,
             "Unix-like" => {
-              let name = Text::new("Enter Unix-like OS name:").prompt()?;
+              let name = Text::new(i18n::TARGET_OS_UNIX_LIKE).prompt()?;
               OsVariant::UnixLike(name)
             },
             "Windows" => OsVariant::Windows,
             "macOS" => OsVariant::macOS,
             "Other" => {
-              let name = Text::new("Enter OS name:").prompt()?;
+              let name = Text::new(i18n::TARGET_OS_OTHER).prompt()?;
               OsVariant::Other(name)
             },
             _ => unreachable!(),
           };
           
-          self.derivative = Text::new("Enter OS derivative:").prompt()?;
+          self.derivative = Text::new(i18n::TARGET_OS_DER).prompt()?;
           
           let version_type = Select::new(
-            "Select version specification type:",
-            vec!["Not Specified", "Weak Specified", "Strong Specified"]
+            i18n::TARGET_OS_VER_S,
+            vec![i18n::TARGET_OS_VER_NS, i18n::TARGET_OS_VER_WS, i18n::TARGET_OS_VER_SS]
           ).prompt()?;
           
           self.version = match version_type {
-            "Not Specified" => OsVersionSpecification::No,
-            "Weak Specified" => {
-              let ver = Text::new("Enter version:").prompt()?;
+            i18n::TARGET_OS_VER_NS => OsVersionSpecification::No,
+            i18n::TARGET_OS_VER_WS => {
+              let ver = Text::new(i18n::TARGET_OS_VER).prompt()?;
               OsVersionSpecification::Weak(ver)
             },
-            "Strong Specified" => {
-              let ver = Text::new("Enter version:").prompt()?;
+            i18n::TARGET_OS_VER_SS => {
+              let ver = Text::new(i18n::TARGET_OS_VER).prompt()?;
               OsVersionSpecification::Strong(ver)
             },
             _ => unreachable!(),

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::hmap;
+use crate::i18n;
 use crate::entities::traits::Edit;
 use crate::utils::tags_custom_type;
 
@@ -16,7 +17,7 @@ pub(crate) enum ProgrammingLanguage {
 
 impl ProgrammingLanguage {
   pub(crate) fn new_from_prompt() -> anyhow::Result<Self> {
-    let s = inquire::Text::new("Input the programming language name:").prompt()?;
+    let s = inquire::Text::new(i18n::PL_INPUT_PROMPT).prompt()?;
     let pl = match s.as_str() {
       "Rust" => Self::Rust,
       "Go" => Self::Go,
@@ -51,18 +52,18 @@ impl Edit for Vec<ProgrammingLanguage> {
       let mut cs = vec![];
       
       self.iter_mut().for_each(|c| {
-        let s = format!("Language `{}`", c);
+        let s = format!("{} `{}`", i18n::LANGUAGE, c);
         
         cmap.insert(s.clone(), c);
         cs.push(s);
       });
       
-      cs.extend_from_slice(&["Add".to_string(), "Remove".to_string()]);
+      cs.extend_from_slice(&[i18n::ADD.to_string(), i18n::REMOVE.to_string()]);
       
-      if let Some(action) = inquire::Select::new("Select a concrete language to change (hit `esc` when done):", cs).prompt_skippable()? {
+      if let Some(action) = inquire::Select::new(&format!("{} {}:", i18n::PL_ACTION_PROMPT, i18n::HIT_ESC), cs).prompt_skippable()? {
         match action.as_str() {
-          "Add" => self.add_item()?,
-          "Remove" => self.remove_item()?,
+          i18n::ADD => self.add_item()?,
+          i18n::REMOVE => self.remove_item()?,
           _ => {},
         }
       } else { break }
@@ -89,7 +90,7 @@ impl Edit for Vec<ProgrammingLanguage> {
       cs.push(s);
     });
     
-    let selected = inquire::Select::new("Select a language to remove:", cs.clone()).prompt()?;
+    let selected = inquire::Select::new(i18n::PL_TO_REMOVE, cs.clone()).prompt()?;
     
     let mut commands = vec![];
     for key in cs {
@@ -107,7 +108,7 @@ pub(crate) fn specify_programming_languages() -> anyhow::Result<Vec<ProgrammingL
   use inquire::MultiSelect;
   
   let langs = vec!["Rust", "Go", "C", "C++", "Python", "Others"];
-  let selected = MultiSelect::new("Select programming languages:", langs).prompt()?;
+  let selected = MultiSelect::new(i18n::PL_SELECT, langs).prompt()?;
   
   let mut result = Vec::new();
   for lang in selected {
@@ -131,7 +132,7 @@ pub(crate) fn specify_programming_languages() -> anyhow::Result<Vec<ProgrammingL
 }
 
 fn collect_multiple_languages() -> anyhow::Result<Vec<ProgrammingLanguage>> {
-  let langs = tags_custom_type("Enter the names of programming languages separated by commas:", None).prompt()?;
+  let langs = tags_custom_type(i18n::PL_COLLECT, None).prompt()?;
   let mut v = vec![];
   
   for lang in langs {

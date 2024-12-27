@@ -44,7 +44,7 @@
               ],
               "commands": [
                 {
-                  "bash_c": "cargo clippy",
+                  "bash_c": "cargo clippy --no-default-features",
                   "ignore_fails": false,
                   "show_success_output": true,
                   "show_bash_c": true,
@@ -69,7 +69,7 @@
               ],
               "commands": [
                 {
-                  "bash_c": "cargo build --release",
+                  "bash_c": "cargo build --release --no-default-features",
                   "ignore_fails": false,
                   "show_success_output": false,
                   "show_bash_c": true,
@@ -173,6 +173,163 @@
         }
       ],
       "default": true
+    },
+    {
+      "title": "build-ru",
+      "desc": "Got from `Deployer Pipeline`.",
+      "info": "deployer-default@0.1.0",
+      "tags": [
+        "cargo",
+        "clippy",
+        "build",
+        "upx"
+      ],
+      "actions": [
+        {
+          "title": "Проверка качества кода",
+          "desc": "Got from `Cargo Clippy`.",
+          "info": "cargo-clippy@0.1.0",
+          "tags": [
+            "cargo",
+            "clippy"
+          ],
+          "action": {
+            "PreBuild": {
+              "supported_langs": [
+                "Rust"
+              ],
+              "commands": [
+                {
+                  "bash_c": "cargo clippy --no-default-features --features=i18n-ru",
+                  "ignore_fails": false,
+                  "show_success_output": true,
+                  "show_bash_c": true,
+                  "only_when_fresh": null
+                }
+              ]
+            }
+          }
+        },
+        {
+          "title": "Сборка",
+          "desc": "Got from `Cargo Build (Release)`. Build the Rust project with Cargo default settings in release mode",
+          "info": "cargo-rel@0.1",
+          "tags": [
+            "rust",
+            "cargo"
+          ],
+          "action": {
+            "Build": {
+              "supported_langs": [
+                "Rust"
+              ],
+              "commands": [
+                {
+                  "bash_c": "cargo build --release --no-default-features --features=i18n-ru",
+                  "ignore_fails": false,
+                  "show_success_output": false,
+                  "show_bash_c": true,
+                  "only_when_fresh": null
+                }
+              ]
+            }
+          }
+        },
+        {
+          "title": "Сжатие",
+          "desc": "Got from `UPX Compress`.",
+          "info": "upx@0.1.0",
+          "tags": [
+            "upx"
+          ],
+          "action": {
+            "PostBuild": {
+              "supported_langs": [
+                "Rust",
+                "Go",
+                "C",
+                "Cpp",
+                "Python",
+                {
+                  "Other": "any"
+                }
+              ],
+              "commands": [
+                {
+                  "bash_c": "upx <artifact>",
+                  "placeholders": [
+                    "<artifact>"
+                  ],
+                  "replacements": [
+                    [
+                      [
+                        "<artifact>",
+                        {
+                          "title": "target/release/deployer",
+                          "is_secret": false,
+                          "value": {
+                            "Plain": "target/release/deployer"
+                          }
+                        }
+                      ]
+                    ]
+                  ],
+                  "ignore_fails": false,
+                  "show_success_output": false,
+                  "show_bash_c": false,
+                  "only_when_fresh": null
+                }
+              ]
+            }
+          }
+        },
+        {
+          "title": "Установка в ~/.cargo/bin",
+          "desc": "",
+          "info": "install-to-cargo-bin@0.1.1",
+          "tags": [
+            "cargo"
+          ],
+          "action": {
+            "Install": {
+              "target": {
+                "arch": "x86_64",
+                "os": "Linux",
+                "derivative": "any",
+                "version": "No"
+              },
+              "commands": [
+                {
+                  "bash_c": "cp -f <artifact> ~/.cargo/bin",
+                  "placeholders": [
+                    "<artifact>"
+                  ],
+                  "replacements": [
+                    [
+                      [
+                        "<artifact>",
+                        {
+                          "title": "target/release/deployer",
+                          "is_secret": false,
+                          "value": {
+                            "Plain": "target/release/deployer"
+                          }
+                        }
+                      ]
+                    ]
+                  ],
+                  "ignore_fails": false,
+                  "show_success_output": false,
+                  "show_bash_c": false,
+                  "only_when_fresh": null
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "default": false,
+      "exclusive_exec_tag": "ru"
     }
   ],
   "artifacts": [

@@ -18,6 +18,8 @@ mod pipelines;
 mod entities;
 mod project;
 
+mod i18n;
+
 use crate::actions::{list_actions, new_action, remove_action, cat_action, edit_action};
 use crate::build::Builds;
 use crate::cmd::{Cli, DeployerExecType, ListType, NewType, RemoveType, CatType, EditType};

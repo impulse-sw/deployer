@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::entities::traits::Edit;
 use crate::hmap;
+use crate::i18n;
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub(crate) struct Variable {
@@ -13,12 +14,12 @@ pub(crate) struct Variable {
 
 impl Variable {
   pub(crate) fn new_from_prompt() -> anyhow::Result<Self> {
-    let title = inquire::Text::new("Enter your variable's title:").prompt()?;
-    println!("{} if variable is a secret, then no command containing this variable will be printed during the build stage.", "Note:".green().italic());
-    let is_secret = inquire::Confirm::new("Is this variable a secret?").with_default(false).prompt()?;
+    let title = inquire::Text::new(i18n::VAR_TITLE).prompt()?;
+    println!("{}: {}", i18n::NOTE.green().italic(), i18n::VAR_NOTE);
+    let is_secret = inquire::Confirm::new(i18n::VAR_IS_SECRET).with_default(false).prompt()?;
     
     // TBD
-    let plain = inquire::Text::new("Enter the variable's content:").prompt()?;
+    let plain = inquire::Text::new(i18n::VAR_CONTENT).prompt()?;
     
     Ok(Variable {
       title,
@@ -44,19 +45,19 @@ impl Variable {
   
   pub(crate) fn edit_variable_from_prompt(&mut self) -> anyhow::Result<()> {
     let actions = vec![
-      "Edit title",
-      "Change secret flag",
-      "Edit value",
+      i18n::EDIT_TITLE,
+      i18n::EDIT_VAR_SECRET,
+      i18n::EDIT_VALUE,
     ];
     
     while let Some(action) = inquire::Select::new(
-      "Select an edit action (hit `esc` when done):",
+      &format!("{} {}:", i18n::EDIT_ACTION_PROMPT, i18n::HIT_ESC),
       actions.clone(),
     ).prompt_skippable()? {
       match action {
-        "Edit title" => self.title = inquire::Text::new("Write the Action's full name:").prompt()?,
-        "Change secret flag" => self.is_secret = inquire::Confirm::new("Is this variable a secret?").with_default(false).prompt()?,
-        "Edit value" => self.value = VarValue::Plain(inquire::Text::new("Enter the variable's content:").prompt()?),
+        i18n::EDIT_TITLE => self.title = inquire::Text::new(i18n::VAR_TITLE).prompt()?,
+        i18n::EDIT_VAR_SECRET => self.is_secret = inquire::Confirm::new(i18n::VAR_IS_SECRET).with_default(false).prompt()?,
+        i18n::EDIT_VALUE => self.value = VarValue::Plain(inquire::Text::new(i18n::VAR_CONTENT).prompt()?),
         _ => {},
       }
     }
@@ -105,18 +106,18 @@ impl Edit for Vec<Variable> {
       let mut cs = vec![];
       
       self.iter_mut().for_each(|c| {
-        let s = format!("Edit variable `{}`", c.title.green());
+        let s = format!("{} `{}`", i18n::VAR_EDIT, c.title.green());
         
         cmap.insert(s.clone(), c);
         cs.push(s);
       });
       
-      cs.extend_from_slice(&["Add variable".to_string(), "Remove variable".to_string()]);
+      cs.extend_from_slice(&[i18n::ADD.to_string(), i18n::REMOVE.to_string()]);
       
-      if let Some(action) = inquire::Select::new("Select a concrete variable to change (hit `esc` when done):", cs).prompt_skippable()? {
+      if let Some(action) = inquire::Select::new(&format!("{} {}:", i18n::VAR_SELECT_FC, i18n::HIT_ESC), cs).prompt_skippable()? {
         match action.as_str() {
-          "Add variable" => self.add_item()?,
-          "Remove variable" => self.remove_item()?,
+          i18n::ADD => self.add_item()?,
+          i18n::REMOVE => self.remove_item()?,
           s if cmap.contains_key(s) => cmap.get_mut(s).unwrap().edit_variable_from_prompt()?,
           _ => {},
         }
@@ -138,13 +139,13 @@ impl Edit for Vec<Variable> {
     let mut cs = vec![];
     
     self.iter().for_each(|c| {
-      let s = format!("Variable `{}`", c.title.green());
+      let s = format!("{} `{}`", i18n::VAR, c.title.green());
       
       cmap.insert(s.clone(), c);
       cs.push(s);
     });
     
-    let selected = inquire::Select::new("Select a variable to remove:", cs.clone()).prompt()?;
+    let selected = inquire::Select::new(i18n::VAR_TO_REMOVE, cs.clone()).prompt()?;
     
     let mut commands = vec![];
     for key in cs {

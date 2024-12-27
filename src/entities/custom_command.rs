@@ -2,6 +2,7 @@ use colored::Colorize;
 use serde::{Deserialize, Serialize};
 
 use crate::hmap;
+use crate::i18n;
 use crate::entities::environment::BuildEnvironment;
 use crate::entities::variables::{Variable, VarTraits};
 use crate::entities::info::{ActionInfo, info2str_simple};
@@ -39,13 +40,13 @@ impl CustomCommand {
   pub(crate) fn new_from_prompt() -> anyhow::Result<CustomCommand> {
     let bash_c = specify_bash_c(None)?;
     
-    let placeholders = tags_custom_type("Enter command placeholders, if any:", None).prompt()?;
+    let placeholders = tags_custom_type(i18n::CMD_PLACEHOLDERS, None).prompt()?;
     let placeholders = if placeholders.is_empty() { None } else { Some(placeholders) };
     
-    let ignore_fails = inquire::Confirm::new("Ignore command failures?").with_default(false).prompt()?;
-    let show_bash_c = inquire::Confirm::new("Show an entire command at build stage?").with_default(true).prompt()?;
-    let show_success_output = inquire::Confirm::new("Show an output of command if it executed successfully?").with_default(false).prompt()?;
-    let only_when_fresh = Some(inquire::Confirm::new("Start a command only in fresh builds?").with_default(false).prompt()?);
+    let ignore_fails = inquire::Confirm::new(i18n::CMD_IGNORE_FAILS).with_default(false).prompt()?;
+    let show_bash_c = inquire::Confirm::new(i18n::CMD_SHOW_BASH_C).with_default(true).prompt()?;
+    let show_success_output = inquire::Confirm::new(i18n::CMD_SHOW_SUCC_OUT).with_default(false).prompt()?;
+    let only_when_fresh = Some(inquire::Confirm::new(i18n::CMD_ONLY_WHEN_FRESH).with_default(false).prompt()?);
     
     Ok(CustomCommand {
       bash_c,
@@ -61,7 +62,7 @@ impl CustomCommand {
   pub(crate) fn new_from_prompt_unspecified() -> anyhow::Result<CustomCommand> {
     let bash_c = specify_bash_c(None)?;
     
-    let placeholders = tags_custom_type("Enter command placeholders, if any:", None).prompt()?;
+    let placeholders = tags_custom_type(i18n::CMD_PLACEHOLDERS, None).prompt()?;
     let placeholders = if placeholders.is_empty() { None } else { Some(placeholders) };
     
     Ok(CustomCommand {
@@ -83,11 +84,11 @@ impl CustomCommand {
   ) -> anyhow::Result<Self> {
     use inquire::{Confirm, Select, Text};
     
-    const USE_ANOTHER: &str = "· Specify another variable";
+    const USE_ANOTHER: &str = i18n::VAR_SPECIFY_ANOTHER;
     
     if self.placeholders.as_ref().is_none_or(|ps| ps.is_empty()) { return Ok(self.clone()) }
     
-    println!("Specifying variables for `{}` Action:", info2str_simple(info).blue());
+    println!("{}", i18n::CMD_SPECIFY_VARS.replace("{}", &info2str_simple(info).blue()));
     
     let mut all_variables = variables.titles();
     all_variables.extend_from_slice(artifacts);
@@ -99,17 +100,17 @@ impl CustomCommand {
       let mut replacement = vec![];
       for placeholder in self.placeholders.as_ref().unwrap() {
         let mut selected = Select::new(
-          &format!("Select variable to replace `{}` in `{}` bash command:", placeholder.green(), self.bash_c.green()),
+          &i18n::CMD_SELECT_TO_REPLACE.replace("{1}", &placeholder.green()).replace("{2}", &self.bash_c.green()),
           all_variables.clone(),
         ).prompt()?;
         
         if variables.is_secret(selected.as_str()) {
-          println!("At build stage the command will be hidden due to usage of secret variable.");
+          println!("{}", i18n::CMD_HIDDEN_VAR);
           explicitly_show_bash_c = Some(false);
         }
         
         if selected.as_str() == USE_ANOTHER {
-          selected = Text::new(&format!("Enter variable to replace `{}` in `{}` bash command:", placeholder.green(), self.bash_c.green())).prompt()?;
+          selected = Text::new(&i18n::CMD_SELECT_TO_REPLACE.replace("{1}", &placeholder.green()).replace("{2}", &self.bash_c.green())).prompt()?;
         }
         
         replacement.push(
@@ -123,7 +124,7 @@ impl CustomCommand {
       }
       
       replacements.push(replacement);
-      if !Confirm::new("Enter `y` if you need exec this command one more time with others variables.").with_default(false).prompt()? { break }
+      if !Confirm::new(i18n::CMD_ONE_MORE_TIME).with_default(false).prompt()? { break }
     }
     
     let mut r = self.clone();
@@ -134,38 +135,38 @@ impl CustomCommand {
   
   pub(crate) fn edit_command_from_prompt(&mut self) -> anyhow::Result<()> {
     while let Some(action) = inquire::Select::new(
-      &format!("Select an option to change in `{}` command (hit `esc` when done):", self.bash_c.green()),
+      &format!("{} {}:", i18n::CMD_SELECT_TO_CHANGE.replace("{}", &self.bash_c.green()), i18n::HIT_ESC),
       vec![
-        "Edit bash command",
-        "Change command placeholders",
-        "Change command failure ignorance",
-        "Change whether command is displayed or not on build stage",
-        "Change whether command output is displayed or not when it executed successfully",
-        "Change command executing only at fresh builds",
+        i18n::CMD_EDIT_SHELL,
+        i18n::CMD_CHANGE_PLACEHOLDERS,
+        i18n::CMD_CHANGE_FAILURE_IGNORANCE,
+        i18n::CMD_CHANGE_VISIBILITY_AT_BUILD,
+        i18n::CMD_CHANGE_VISIBILITY_ON_SUCC,
+        i18n::CMD_CHANGE_ON_FRESH,
       ],
     ).prompt_skippable()? {
       match action {
-        "Edit bash command" => self.bash_c = specify_bash_c(Some(self.bash_c.as_str()))?,
-        "Change command placeholders" => {
+        i18n::CMD_EDIT_SHELL => self.bash_c = specify_bash_c(Some(self.bash_c.as_str()))?,
+        i18n::CMD_CHANGE_PLACEHOLDERS => {
           let placeholders = if let Some(phs) = &self.placeholders {
             let joined = phs.join(", ");
-            tags_custom_type("Enter command placeholders, if any:", Some(joined.as_str())).prompt()?
+            tags_custom_type(i18n::CMD_PLACEHOLDERS, Some(joined.as_str())).prompt()?
           } else {
-            tags_custom_type("Enter command placeholders, if any:", None).prompt()?
+            tags_custom_type(i18n::CMD_PLACEHOLDERS, None).prompt()?
           };
           self.placeholders = if placeholders.is_empty() { None } else { Some(placeholders) };
         },
-        "Change command failure ignorance" => {
-          self.ignore_fails = inquire::Confirm::new("Ignore command failures?").with_default(false).prompt()?;
+        i18n::CMD_CHANGE_FAILURE_IGNORANCE => {
+          self.ignore_fails = inquire::Confirm::new(i18n::CMD_IGNORE_FAILS).with_default(false).prompt()?;
         },
-        "Change whether command is displayed or not on build stage" => {
-          self.show_bash_c = inquire::Confirm::new("Show an entire command at build stage?").with_default(true).prompt()?;
+        i18n::CMD_CHANGE_VISIBILITY_AT_BUILD => {
+          self.show_bash_c = inquire::Confirm::new(i18n::CMD_SHOW_BASH_C).with_default(true).prompt()?;
         },
-        "Change whether command output is displayed or not when it executed successfully" => {
-          self.show_success_output = inquire::Confirm::new("Show an output of command if it executed successfully?").with_default(false).prompt()?;
+        i18n::CMD_CHANGE_VISIBILITY_ON_SUCC => {
+          self.show_success_output = inquire::Confirm::new(i18n::CMD_SHOW_SUCC_OUT).with_default(false).prompt()?;
         },
-        "Change command executing only at fresh builds" => {
-          self.only_when_fresh = if inquire::Confirm::new("Start a command only in fresh builds?").with_default(false).prompt()? {
+        i18n::CMD_CHANGE_ON_FRESH => {
+          self.only_when_fresh = if inquire::Confirm::new(i18n::CMD_ONLY_WHEN_FRESH).with_default(false).prompt()? {
             Some(true)
           } else {
             None
@@ -182,27 +183,28 @@ impl CustomCommand {
 pub(crate) fn specify_bash_c(default: Option<&str>) -> anyhow::Result<String> {
   let mut bash_c;
   loop {
-    let mut text_prompt = inquire::Text::new("Enter typical shell command (or enter '/h' for help):");
+    let prompt = format!("{} {}:", i18n::CMD_SPECIFY_BASH_C, i18n::CHECK_HELP);
+    let mut text_prompt = inquire::Text::new(prompt.as_str());
     if let Some(default) = default { text_prompt = text_prompt.with_initial_value(default); }
     bash_c = text_prompt.prompt()?;
     if bash_c.as_str() != "/h" { break }
-    println!("Guide: `{}`", "Shell Commands for Deployer".blue());
-    println!(">>> The usage of shell commands in Deployer is very simple.");
-    println!(">>> You can use `{}` for home directories, your default `{}` variable and so on.", "~".green(), "PATH".green());
+    println!("{}: `{}`", i18n::GUIDE, i18n::CUSTOM_CMD_GUIDE_TITLE.blue());
+    println!(">>> {}", i18n::CUSTOM_CMD_GUIDE_1);
+    println!(">>> {}", i18n::CUSTOM_CMD_GUIDE_2.replace("%1%", &"~".green()).replace("%2%", &"PATH".green()));
     println!(">>> ");
-    println!(">>> Also you can write your commands even when there are some unspecified variables:");
+    println!(">>> {}", i18n::CUSTOM_CMD_GUIDE_3);
     println!(">>> `{}`", "g++ <input-file> -o <output-file>".green());
     println!(">>> `{}{}`", "docker compose run -e DEPLOY_KEY=".green(), "{{my very secret key}}".red());
     println!(">>> ");
-    println!(">>> To specify shell for Deployer, use `DEPLOYER_SH_PATH` environment variable.");
-    println!(">>> By default: using `{}`.", "/bin/bash".green());
+    println!(">>> {}", i18n::CUSTOM_CMD_GUIDE_4);
+    println!(">>> {} `{}`.", i18n::CUSTOM_CMD_GUIDE_5, "/bin/bash".green());
     
     let shell = match std::env::var("DEPLOYER_SH_PATH") {
-      Ok(path) => path.green().to_string(),
-      Err(_) => format!("unspecified (`{}`)", "/bin/bash".green()),
+      Ok(path) => format!("`{}`", path.green()),
+      Err(_) => format!("\"\" (`{}`)", "/bin/bash".green()),
     };
     
-    println!(">>> The current value of `DEPLOYER_SH_PATH`: {}", shell);
+    println!(">>> {} {}", i18n::CUSTOM_CMD_GUIDE_6, shell);
   }
   
   Ok(bash_c)
@@ -215,19 +217,21 @@ impl Edit for Vec<CustomCommand> {
       let mut cs = vec![];
       
       self.iter_mut().for_each(|c| {
-        let s = format!("Edit command `{}`", c.bash_c.green());
-        
+        let s = format!("{} `{}`", i18n::CUSTOM_CMD_EDIT, c.bash_c.green());
         cmap.insert(s.clone(), c);
         cs.push(s);
       });
       
-      cs.extend_from_slice(&["Reorder commands".to_string(), "Add command".to_string(), "Remove command".to_string()]);
+      cs.extend_from_slice(&[i18n::CUSTOM_CMD_REORDER.to_string(), i18n::CUSTOM_CMD_ADD.to_string(), i18n::CUSTOM_CMD_RM.to_string()]);
       
-      if let Some(action) = inquire::Select::new("Select a concrete command to change (hit `esc` when done):", cs).prompt_skippable()? {
+      if let Some(action) = inquire::Select::new(
+        &format!("{} {}:", i18n::CUSTOM_CMD_EDIT_PROMPT, i18n::HIT_ESC),
+        cs,
+      ).prompt_skippable()? {
         match action.as_str() {
-          "Reorder commands" => self.reorder()?,
-          "Add command" => self.add_item()?,
-          "Remove command" => self.remove_item()?,
+          i18n::CUSTOM_CMD_REORDER => self.reorder()?,
+          i18n::CUSTOM_CMD_ADD => self.add_item()?,
+          i18n::CUSTOM_CMD_RM => self.remove_item()?,
           s if cmap.contains_key(s) => cmap.get_mut(s).unwrap().edit_command_from_prompt()?,
           _ => {},
         }
@@ -249,7 +253,7 @@ impl Edit for Vec<CustomCommand> {
       h.insert(key, selected_command);
     }
     
-    let reordered = ReorderableList::new("Reorder Action's commands:", k).prompt()?;
+    let reordered = ReorderableList::new(i18n::CMDS_REORDER, k).prompt()?;
     
     let mut selected_commands_ordered = vec![];
     for key in reordered {
@@ -278,7 +282,7 @@ impl Edit for Vec<CustomCommand> {
       cs.push(s);
     });
     
-    let selected = inquire::Select::new("Select a command to remove:", cs.clone()).prompt()?;
+    let selected = inquire::Select::new(i18n::CMD_SELECT_TO_REMOVE, cs.clone()).prompt()?;
     
     let mut commands = vec![];
     for key in cs {
@@ -298,7 +302,7 @@ impl Execute for CustomCommand {
     
     if !env.new_build && self.only_when_fresh.is_some_and(|v| v) {
       if *crate::rw::VERBOSE.wait() {
-        output.push("Skip a command due to not a fresh build...".to_string());
+        output.push(i18n::CMD_SKIP_DUE_TO_NOT_FRESH.to_string());
       }
       return Ok((true, output))
     }
@@ -398,9 +402,9 @@ fn compose_output(
   
   if !stdout.trim().is_empty() || !stderr.trim().is_empty() {
     if show_bash_c {
-      output.push(format!("Executing `{}`:", bash_c_info));
+      output.push(format!("{} `{}`:", i18n::EXECUTING, bash_c_info));
     } else {
-      output.push("Executing the command:".to_string());
+      output.push(i18n::EXECUTING_HIDDEN.to_string());
     }
   }
   if !stdout.trim().is_empty() {
@@ -413,7 +417,7 @@ fn compose_output(
   }
   if !stderr.trim().is_empty() {
     let total = stderr.chars().filter(|c| *c == '\n').count();
-    if total != 0 && !success { output.push(format!("{}", "Errors:".red().bold())); }
+    if total != 0 && !success { output.push(format!("{}", i18n::ERRORS.red().bold())); }
     
     for (i, line) in stderr.split('\n').enumerate() {
       if i == total && line.trim().is_empty() { break }

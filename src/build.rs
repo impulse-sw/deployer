@@ -7,6 +7,7 @@ use crate::{CACHE_DIR, ARTIFACTS_DIR, BUILD_CACHE_LIST};
 use crate::entities::environment::BuildEnvironment;
 use crate::cmd::{BuildArgs, CleanArgs};
 use crate::configs::DeployerProjectOptions;
+use crate::i18n;
 use crate::pipelines::{execute_pipeline, DescribedPipeline};
 use crate::rw::{copy_all, write, symlink, log};
 use crate::utils::get_current_working_dir;
@@ -148,7 +149,7 @@ pub(crate) fn build(
   cache_dir: &Path,
   args: &BuildArgs,
 ) -> anyhow::Result<()> {
-  if *config == Default::default() { panic!("Config is invalid! Reinit the project."); }
+  if *config == Default::default() { panic!("{}", i18n::CFG_INVALID); }
   
   if args.link_cache && args.copy_cache { panic!(
     "Select only one option from `{}` and `{}`. See help via `{}`.", "c".green(), "C".green(), "deployer build -h".green()
@@ -165,21 +166,25 @@ pub(crate) fn build(
   if args.silent && args.no_pipe { panic!(
     "Select only one option from `{}` and `{}`. See help via `{}`.", "s".green(), "t".green(), "deployer build -h".green()
   ); }
-  
+
   let curr_dir = std::env::current_dir().expect("Can't get current dir!");
   let artifacts_dir = prepare_artifacts_folder(&curr_dir)?;
-  
+
   if args.pipeline_tags.is_empty() {
     if config.pipelines.is_empty() {
       panic!("The pipelines' list is empty! Check the config file for errors.");
     }
-    if let Some(pipeline) = &config.pipelines.iter().find(|p| p.default.is_some_and(|v| v)) {
+
+    let cntr = config.pipelines.iter().filter(|p| p.default.is_some_and(|v| v)).count();
+    if cntr == 0 { panic!("There is no default Pipelines! Please, specify at least one to execute."); }
+
+    for pipeline in config.pipelines.iter().filter(|p| p.default.is_some_and(|v| v)) {
       let (build_path, new_build) = if args.current {
         (curr_dir.clone(), false)
       } else {
         prepare_build_folder(config, builds, pipeline, &curr_dir, cache_dir, args)?
       };
-      
+
       let env = BuildEnvironment {
         build_dir: &build_path,
         cache_dir,
